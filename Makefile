@@ -1,0 +1,57 @@
+# Makefile for ISP Pipeline Project
+
+# 编译器设置
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+
+# OpenCV 配置
+OPENCV_CFLAGS = $(shell pkg-config --cflags opencv4 2>/dev/null || pkg-config --cflags opencv)
+OPENCV_LIBS = $(shell pkg-config --libs opencv4 2>/dev/null || pkg-config --libs opencv)
+
+# 目录设置
+SRC_DIR = src
+CORE_DIR = $(SRC_DIR)/core
+TESTS_DIR = $(SRC_DIR)/tests
+BUILD_DIR = build
+
+# 源文件
+CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp
+TEST_SOURCES = $(TESTS_DIR)/test_raw_reader.cpp
+
+# 目标文件
+CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o
+TEST_TARGET = $(BUILD_DIR)/test_raw_reader
+
+# 默认目标
+all: $(TEST_TARGET)
+
+# 创建构建目录
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+# 编译核心模块
+$(BUILD_DIR)/raw_reader.o: $(CORE_DIR)/raw_reader.cpp $(CORE_DIR)/raw_reader.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
+# 编译测试程序
+$(TEST_TARGET): $(TEST_SOURCES) $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
+
+# 运行测试
+run: $(TEST_TARGET)
+	./$(TEST_TARGET)
+
+# 清理
+clean:
+	rm -rf $(BUILD_DIR)
+
+# 帮助信息
+help:
+	@echo "Available targets:"
+	@echo "  make          - Build the test program"
+	@echo "  make run      - Build and run the test program"
+	@echo "  make clean    - Remove build files"
+	@echo "  make help     - Show this help message"
+
+.PHONY: all run clean help
+
