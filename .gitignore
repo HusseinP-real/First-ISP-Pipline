@@ -29,7 +29,9 @@ obj/
 
 # Data files
 data/output/*
+!data/output/.gitkeep
 data/reference/*
+!data/reference/.gitkeep
 *.raw
 *.dng
 *.jpg
