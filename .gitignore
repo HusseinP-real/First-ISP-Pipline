@@ -1,30 +1,24 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+# C++ Build
 build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+!CMakeLists.txt
+*.a
+*.lib
+*.dll
+*.dylib
+*.exe
+*.out
+*.o
+*.obj
+*.so
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
+# Build directories
+bin/
+lib/
+obj/
 
 # IDE
 .vscode/
@@ -52,12 +46,10 @@ logs/
 Thumbs.db
 
 # Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Jupyter Notebook
-.ipynb_checkpoints
+*.gcov
+*.gcda
+*.gcno
+coverage/
 
 # Temporary files
 *.tmp

@@ -1,39 +1,24 @@
 # ISP Pipeline Project
 
-图像信号处理（Image Signal Processing）Pipeline项目
+图像信号处理（Image Signal Processing）Pipeline项目 (C++)
 
 ## 项目结构
 
 详细的项目结构说明请参考 [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)
 
-## 快速开始
-
-### 1. 创建项目目录结构
-
-```bash
-mkdir -p src/{core,modules,utils,tests}
-mkdir -p configs/{camera_profiles,tuning_params}
-mkdir -p data/{input,output,reference}
-mkdir -p scripts docs
-```
-
-### 2. 安装依赖
-
-```bash
-pip install numpy opencv-python pillow pyyaml matplotlib pytest
-```
-
-### 3. 项目结构概览
+## 项目结构概览
 
 ```
 pusenProject1/
 ├── src/              # 源代码
 │   ├── core/         # 核心pipeline和I/O
 │   ├── modules/      # ISP处理模块
-│   └── utils/        # 工具函数
+│   ├── utils/        # 工具函数
+│   └── tests/        # 单元测试
+├── include/          # 头文件（可选）
 ├── configs/          # 配置文件
 ├── data/             # 数据文件
-├── scripts/          # 运行脚本
+├── scripts/          # 脚本工具
 └── docs/             # 文档
 ```
 
@@ -50,13 +35,6 @@ pusenProject1/
 7. 降噪
 8. 锐化
 9. 输出处理后的图像
-
-## 开发建议
-
-1. 从核心模块开始：先实现 `raw_reader.py` 和 `pipeline.py`
-2. 逐步添加处理模块：按处理顺序逐个实现
-3. 使用配置文件管理参数，便于调优
-4. 为每个模块编写单元测试
 
 ## 参考文档
 
