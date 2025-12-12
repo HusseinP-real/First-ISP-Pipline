@@ -19,8 +19,10 @@ int main() {
     std::cout << "Frame index: " << frameIndex << " (file contains 28 frames)" << std::endl;
     std::cout << "Image size: " << rawImage.cols << "x" << rawImage.rows << std::endl;
 
-    // ... 读取代码后 ...
-
+    // 判读标准：
+    // 如果 Max Value 是 0 -> 读取失败，全黑。
+    // 如果 Max Value 很大 (例如 > 60000) -> 可能是乱码或字节序错误。
+    // 如果 Max Value 是 1023, 4095, 16383 附近 -> 恭喜！读取完美成功，分别是 10位/12位/14位数据。
     double minVal, maxVal;
     cv::Point minLoc, maxLoc;
     cv::minMaxLoc(rawImage, &minVal, &maxVal, &minLoc, &maxLoc);
@@ -29,10 +31,7 @@ int main() {
     std::cout << "Min Value: " << minVal << std::endl;
     std::cout << "Max Value: " << maxVal << std::endl;
 
-    // 判读标准：
-    // 如果 Max Value 是 0 -> 读取失败，全黑。
-    // 如果 Max Value 很大 (例如 > 60000) -> 可能是乱码或字节序错误。
-    // 如果 Max Value 是 1023, 4095, 16383 附近 -> 恭喜！读取完美成功，分别是 10位/12位/14位数据。
+    
     
     // 归一化以便保存（16位数据需要归一化到0-255范围）
     // 如果读取正确，保存的图像应该是黑白马赛克图（有很多噪点感觉的图）
