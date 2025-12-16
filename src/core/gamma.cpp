@@ -3,12 +3,12 @@
 
 
 
-GammaCorrection::GammaCorrection(float gammaVal) {
-    createLut16to8(gammaVal);
+GammaCorrection::GammaCorrection() {
+    createLut16to8();
 }
 
-void GammaCorrection::updateGamma(float gammaVal) {
-    createLut16to8(gammaVal);
+void GammaCorrection::updateGamma() {
+    createLut16to8();
 }
 
 void GammaCorrection::run(const cv::Mat& rawImage, cv::Mat& dst) {
@@ -32,8 +32,8 @@ void GammaCorrection::run(const cv::Mat& rawImage, cv::Mat& dst) {
     }
 }
 
-void GammaCorrection::createLut16to8(float /*gammaVal*/) {
-    // 使用固定的 sRGB 曲线，而不是简单的幂函数 gamma
+void GammaCorrection::createLut16to8() {
+    // 使用固定的 sRGB 曲线
     lut.resize(65536);
     for (int i = 0; i < 65536; ++i) {
         float v = i / 65535.0f; // 归一化到 [0,1]

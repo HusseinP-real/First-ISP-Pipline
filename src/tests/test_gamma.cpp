@@ -42,7 +42,7 @@ int main() {
     std::cout << "Demosaic done." << std::endl;
 
     // 5) Gamma 校正 (16-bit -> 8-bit BGR)
-    GammaCorrection gamma(2.2f);
+    GammaCorrection gamma;
     cv::Mat color8;
     gamma.run(color16, color8);
     if (color8.empty()) {
