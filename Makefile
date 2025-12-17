@@ -15,19 +15,21 @@ TESTS_DIR = $(SRC_DIR)/tests
 BUILD_DIR = build
 
 # 源文件
-CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp $(CORE_DIR)/blc.cpp $(CORE_DIR)/awb.cpp $(CORE_DIR)/gamma.cpp
-TEST_SOURCES = $(TESTS_DIR)/test_raw_reader.cpp $(TESTS_DIR)/test_blc.cpp $(TESTS_DIR)/test_awb.cpp $(TESTS_DIR)/test_gamma.cpp $(TESTS_DIR)/trydemosiac.cpp
+CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp $(CORE_DIR)/blc.cpp $(CORE_DIR)/awb.cpp $(CORE_DIR)/gamma.cpp $(CORE_DIR)/demosiac.cpp $(CORE_DIR)/ccm.cpp
+TEST_SOURCES = $(TESTS_DIR)/test_raw_reader.cpp $(TESTS_DIR)/test_blc.cpp $(TESTS_DIR)/test_awb.cpp $(TESTS_DIR)/test_gamma.cpp $(TESTS_DIR)/test_demosiac.cpp $(TESTS_DIR)/trydemosiac.cpp $(TESTS_DIR)/test_ccm.cpp
 
 # 目标文件
-CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o $(BUILD_DIR)/blc.o $(BUILD_DIR)/awb.o $(BUILD_DIR)/gamma.o
+CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o $(BUILD_DIR)/blc.o $(BUILD_DIR)/awb.o $(BUILD_DIR)/gamma.o $(BUILD_DIR)/demosiac.o $(BUILD_DIR)/ccm.o
 TEST_TARGET = $(BUILD_DIR)/test_raw_reader
 TEST_BLC_TARGET = $(BUILD_DIR)/test_blc
 TEST_AWB_TARGET = $(BUILD_DIR)/test_awb
 TEST_GAMMA_TARGET = $(BUILD_DIR)/test_gamma
+TEST_DEMOSAIC_TARGET = $(BUILD_DIR)/test_demosiac
 TRY_DEMOSAIC_TARGET = $(BUILD_DIR)/trydemosiac
+TEST_CCM_TARGET = $(BUILD_DIR)/test_ccm
 
 # 默认目标
-all: $(TEST_TARGET) $(TEST_BLC_TARGET) $(TEST_AWB_TARGET) $(TEST_GAMMA_TARGET) $(TRY_DEMOSAIC_TARGET)
+all: $(TEST_TARGET) $(TEST_BLC_TARGET) $(TEST_AWB_TARGET) $(TEST_GAMMA_TARGET) $(TEST_DEMOSAIC_TARGET) $(TRY_DEMOSAIC_TARGET) $(TEST_CCM_TARGET)
 
 # 创建构建目录
 $(BUILD_DIR):
@@ -46,6 +48,12 @@ $(BUILD_DIR)/awb.o: $(CORE_DIR)/awb.cpp $(CORE_DIR)/awb.h | $(BUILD_DIR)
 $(BUILD_DIR)/gamma.o: $(CORE_DIR)/gamma.cpp $(CORE_DIR)/gamma.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/demosiac.o: $(CORE_DIR)/demosiac.cpp $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/ccm.o: $(CORE_DIR)/ccm.cpp $(CORE_DIR)/ccm.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
 # 编译测试程序
 $(TEST_TARGET): $(TESTS_DIR)/test_raw_reader.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
@@ -59,7 +67,13 @@ $(TEST_AWB_TARGET): $(TESTS_DIR)/test_awb.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 $(TEST_GAMMA_TARGET): $(TESTS_DIR)/test_gamma.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
 
+$(TEST_DEMOSAIC_TARGET): $(TESTS_DIR)/test_demosiac.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
+
 $(TRY_DEMOSAIC_TARGET): $(TESTS_DIR)/trydemosiac.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
+
+$(TEST_CCM_TARGET): $(TESTS_DIR)/test_ccm.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
 
 # 运行测试
@@ -75,8 +89,14 @@ run-awb: $(TEST_AWB_TARGET)
 run-gamma: $(TEST_GAMMA_TARGET)
 	./$(TEST_GAMMA_TARGET)
 
-run-demosiac: $(TRY_DEMOSAIC_TARGET)
+run-demosiac: $(TEST_DEMOSAIC_TARGET)
+	./$(TEST_DEMOSAIC_TARGET)
+
+run-trydemosiac: $(TRY_DEMOSAIC_TARGET)
 	./$(TRY_DEMOSAIC_TARGET)
+
+run-ccm: $(TEST_CCM_TARGET)
+	./$(TEST_CCM_TARGET)
 
 # 清理
 clean:
@@ -89,9 +109,12 @@ help:
 	@echo "  make run         - Build and run test_raw_reader"
 	@echo "  make run-blc     - Build and run test_blc"
 	@echo "  make run-awb     - Build and run test_awb"
-	@echo "  make run-demosiac - Build and run trydemosiac"
+	@echo "  make run-gamma   - Build and run test_gamma"
+	@echo "  make run-demosiac - Build and run test_demosiac"
+	@echo "  make run-trydemosiac - Build and run trydemosiac"
+	@echo "  make run-ccm     - Build and run test_ccm"
 	@echo "  make clean       - Remove build files"
 	@echo "  make help        - Show this help message"
 
-.PHONY: all run run-blc run-awb run-demosiac clean help
+.PHONY: all run run-blc run-awb run-gamma run-demosiac run-trydemosiac run-ccm clean help
 

@@ -19,7 +19,8 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
                 uint16_t value = row[x];
 
                 // filter
-                if (value < 20 || value > 240) continue;
+                //if (value < 20 || value > 240) continue;
+                if (value < 100 || value > 60000) continue;
 
                 // judge rgb
                 if (y % 2 == 0) {
