@@ -2,6 +2,7 @@
 #include "../core/blc.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
+#include "../core/demosiac.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
@@ -13,7 +14,7 @@ int main() {
     const int height = 500;
     const int frameIndex = 0;
 
-    // 1) 读取 RAW (16-bit 单通道，RGGB)
+    // 1) 读取 RAW (16-bit 单通道，BGGR)
     cv::Mat raw = readRawToMat(inputFile, width, height, frameIndex);
     if (raw.empty()) {
         std::cerr << "Failed to read RAW image: " << inputFile << std::endl;
@@ -36,9 +37,9 @@ int main() {
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 4) Demosaic (RGGB -> BGR, 保持 16-bit)
+    // 4) Demosaic (使用本地实现，BGGR -> BGR，保持 16-bit)
     cv::Mat color16;
-    cv::cvtColor(raw, color16, cv::COLOR_BayerRG2BGR);
+    demosiac(raw, color16, BGGR);
     std::cout << "Demosaic done." << std::endl;
 
     // 5) Gamma 校正 (16-bit -> 8-bit BGR)

@@ -19,14 +19,14 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
                 uint16_t value = row[x];
 
                 // filter
-                if (value < 20 || value > 240) continue;
+                if (value < 100 || value > 60000) continue;
 
                 // judge rgb
                 if (y % 2 == 0) {
                     // r g r g ...
                     if (x % 2 == 0) {
-                        sumR += value;
-                        countR++;
+                        sumB += value;
+                        countB++;
                     } else {
                         sumG += value;
                         countG++;
@@ -37,8 +37,8 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
                         sumG += value;
                         countG++;
                     } else {
-                        sumB += value;
-                        countB++;
+                        sumR += value;
+                        countR++;
                     }
                     
                 }
@@ -82,7 +82,7 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
             // rggb pattern determine
             if (y % 2 == 0) {
                 if (x % 2 == 0) {
-                    gain = gains.r;
+                    gain = gains.b;
                 } else {
                     gain = gains.g;
                 }
@@ -90,7 +90,7 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
                 if (x % 2 == 0) {
                     gain = gains.g;
                 } else {
-                    gain = gains.b;
+                    gain = gains.r;
                 }
             }
 

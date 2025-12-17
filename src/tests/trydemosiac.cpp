@@ -22,10 +22,10 @@ int main() {
     cv::subtract(raw, cv::Scalar(blackLevel), raw);
     std::cout << "Raw loaded and BLC applied." << std::endl;
 
-    // 只测试 RGGB（不再遍历所有 Bayer 模式）
+    // 只测试 BGGR（不再遍历所有 Bayer 模式）
     struct Pattern { int code; std::string name; };
     std::vector<Pattern> patterns = {
-        {cv::COLOR_BayerRG2BGR, "RGGB"}
+        {cv::COLOR_BayerBG2BGR, "BGGR"}
     };
 
     // 手动 AWB 增益，与 test_awb.cpp 保持一致

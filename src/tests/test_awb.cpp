@@ -85,12 +85,14 @@ int main() {
             const uint16_t* row = workImg.ptr<uint16_t>(y);
             for (int x = 0; x < workImg.cols; x++) {
                 uint16_t value = row[x];
-                
-                // RGGB pattern
+
+                // BGGR pattern:
+                //  y 偶行: x 偶 -> B, x 奇 -> G
+                //  y 奇行: x 偶 -> G, x 奇 -> R
                 if (y % 2 == 0) {
                     if (x % 2 == 0) {
-                        sumR += value;
-                        countR++;
+                        sumB += value;
+                        countB++;
                     } else {
                         sumG += value;
                         countG++;
@@ -100,8 +102,8 @@ int main() {
                         sumG += value;
                         countG++;
                     } else {
-                        sumB += value;
-                        countB++;
+                        sumR += value;
+                        countR++;
                     }
                 }
             }

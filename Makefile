@@ -15,11 +15,19 @@ TESTS_DIR = $(SRC_DIR)/tests
 BUILD_DIR = build
 
 # 源文件
-CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp $(CORE_DIR)/blc.cpp $(CORE_DIR)/awb.cpp $(CORE_DIR)/gamma.cpp
+CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp \
+               $(CORE_DIR)/blc.cpp \
+               $(CORE_DIR)/awb.cpp \
+               $(CORE_DIR)/gamma.cpp \
+               $(CORE_DIR)/demosiac.cpp
 TEST_SOURCES = $(TESTS_DIR)/test_raw_reader.cpp $(TESTS_DIR)/test_blc.cpp $(TESTS_DIR)/test_awb.cpp $(TESTS_DIR)/test_gamma.cpp $(TESTS_DIR)/trydemosiac.cpp
 
 # 目标文件
-CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o $(BUILD_DIR)/blc.o $(BUILD_DIR)/awb.o $(BUILD_DIR)/gamma.o
+CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
+               $(BUILD_DIR)/blc.o \
+               $(BUILD_DIR)/awb.o \
+               $(BUILD_DIR)/gamma.o \
+               $(BUILD_DIR)/demosiac.o
 TEST_TARGET = $(BUILD_DIR)/test_raw_reader
 TEST_BLC_TARGET = $(BUILD_DIR)/test_blc
 TEST_AWB_TARGET = $(BUILD_DIR)/test_awb
@@ -44,6 +52,9 @@ $(BUILD_DIR)/awb.o: $(CORE_DIR)/awb.cpp $(CORE_DIR)/awb.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/gamma.o: $(CORE_DIR)/gamma.cpp $(CORE_DIR)/gamma.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/demosiac.o: $(CORE_DIR)/demosiac.cpp $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
 # 编译测试程序
