@@ -7,9 +7,11 @@
 class ColorCorrectionMatrix {
 private:
     static const int Q_FACTOR_SHIFT = 10;
-    // 1024
+    // 1024 - Fixed-point scale factor (2^10)
     static const int Q_FACTOR_SCALE = 1 << Q_FACTOR_SHIFT;
-    // 512
+    // 512 - Rounding offset for proper rounding (half of Q_FACTOR_SCALE)
+    // This ensures (value + ROUNDING_OFFSET) >> Q_FACTOR_SHIFT performs true rounding
+    // instead of truncation, preventing darkening and loss of detail in shadows
     static const int ROUNDING_OFFSET = 1 << (Q_FACTOR_SHIFT - 1);
 
     // store the ccm matrix

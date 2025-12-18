@@ -23,7 +23,7 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
 
                 // judge rgb
                 if (y % 2 == 0) {
-                    // r g r g ...
+                    // b g b g ...
                     if (x % 2 == 0) {
                         sumB += value;
                         countB++;
@@ -79,7 +79,7 @@ void runAWB(cv::Mat& rawImage, AWBGains& gains, bool enableAuto) {
             uint16_t value = row[x];
             float gain = 1.0f;
 
-            // rggb pattern determine
+            // bggr pattern determine
             if (y % 2 == 0) {
                 if (x % 2 == 0) {
                     gain = gains.b;
