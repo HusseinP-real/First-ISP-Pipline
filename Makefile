@@ -17,19 +17,23 @@ BUILD_DIR = build
 # 源文件
 CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp \
                $(CORE_DIR)/blc.cpp \
+               $(CORE_DIR)/denoise.cpp \
                $(CORE_DIR)/awb.cpp \
                $(CORE_DIR)/gamma.cpp \
                $(CORE_DIR)/demosiac.cpp \
-               $(CORE_DIR)/ccm.cpp
+               $(CORE_DIR)/ccm.cpp \
+               $(CORE_DIR)/sharpen.cpp
 TEST_SOURCES = $(TESTS_DIR)/test_raw_reader.cpp $(TESTS_DIR)/test_blc.cpp $(TESTS_DIR)/test_awb.cpp $(TESTS_DIR)/test_gamma.cpp $(TESTS_DIR)/trydemosiac.cpp $(TESTS_DIR)/test_ccm.cpp
 
 # 目标文件
 CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
                $(BUILD_DIR)/blc.o \
+               $(BUILD_DIR)/denoise.o \
                $(BUILD_DIR)/awb.o \
                $(BUILD_DIR)/gamma.o \
                $(BUILD_DIR)/demosiac.o \
-               $(BUILD_DIR)/ccm.o
+               $(BUILD_DIR)/ccm.o \
+               $(BUILD_DIR)/sharpen.o
 TEST_TARGET = $(BUILD_DIR)/test_raw_reader
 TEST_BLC_TARGET = $(BUILD_DIR)/test_blc
 TEST_AWB_TARGET = $(BUILD_DIR)/test_awb
@@ -51,6 +55,9 @@ $(BUILD_DIR)/raw_reader.o: $(CORE_DIR)/raw_reader.cpp $(CORE_DIR)/raw_reader.h |
 $(BUILD_DIR)/blc.o: $(CORE_DIR)/blc.cpp $(CORE_DIR)/blc.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/denoise.o: $(CORE_DIR)/denoise.cpp $(CORE_DIR)/denoise.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/awb.o: $(CORE_DIR)/awb.cpp $(CORE_DIR)/awb.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
@@ -61,6 +68,9 @@ $(BUILD_DIR)/demosiac.o: $(CORE_DIR)/demosiac.cpp $(CORE_DIR)/demosiac.h | $(BUI
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/ccm.o: $(CORE_DIR)/ccm.cpp $(CORE_DIR)/ccm.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sharpen.o: $(CORE_DIR)/sharpen.cpp $(CORE_DIR)/sharpen.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
 # 编译测试程序

@@ -13,18 +13,22 @@ std::vector<double> init_range_weight_lut(double sigma_r);
 // @return: 预计算的空间权重核
 std::vector<std::vector<double>> init_spatial_weight_kernel(int radius, double sigma_s);
 
-// 对单通道图像进行双边滤波降噪
-// @param src: 输入图像数据（一维向量）
+// 引导双边滤波（Joint / Guided Bilateral Filter）
+// @param src: 需要被平滑/降噪的通道
+// @param guide: 引导图（决定“哪里是边缘”），通常为 G 通道
 // @param dst: 输出图像数据（一维向量，会被修改）
 // @param w: 图像宽度
 // @param h: 图像高度
 // @param range_lut: 范围权重查找表
 // @param spatial_kernel: 空间权重核
 // @param radius: 滤波半径
-void bilateral_filter_sub_image(const std::vector<uint16_t>& src, std::vector<uint16_t>& dst, 
-                                int w, int h, const std::vector<double>& range_lut,
-                                const std::vector<std::vector<double>>& spatial_kernel,
-                                int radius);
+void bilateral_filter_guided(const std::vector<uint16_t>& src,
+                             const std::vector<uint16_t>& guide,
+                             std::vector<uint16_t>& dst,
+                             int w, int h,
+                             const std::vector<double>& range_lut,
+                             const std::vector<std::vector<double>>& spatial_kernel,
+                             int radius);
 
 // 对RAW图像进行降噪处理（BGGR格式）
 // 将RAW图像按Bayer模式分离为4个通道，分别进行双边滤波，然后重新合并

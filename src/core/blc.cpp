@@ -59,10 +59,15 @@ void applyBlc(uint16_t* rawImage, const imageInfo& info, const blackLevels& bls)
     int width = info.width;
 
     // convert to int saving performance
-    int bl_r_int  = static_cast<int>(bls.r + 0.5f);
-    int bl_gr_int = static_cast<int>(bls.gr + 0.5f);
-    int bl_gb_int = static_cast<int>(bls.gb + 0.5f);
-    int bl_b_int  = static_cast<int>(bls.b + 0.5f);
+    // NOTE: guard against negative black levels (can happen with bad stats) to avoid uint16 wrap-around.
+    auto clamp_black = [](float v) -> int {
+        int iv = static_cast<int>(v + (v >= 0.0f ? 0.5f : -0.5f));
+        return std::clamp(iv, 0, 65535);
+    };
+    int bl_r_int  = clamp_black(bls.r);
+    int bl_gr_int = clamp_black(bls.gr);
+    int bl_gb_int = clamp_black(bls.gb);
+    int bl_b_int  = clamp_black(bls.b);
 
     // apply correction
     for (int y = 0; y < height; y++) {
@@ -87,11 +92,9 @@ void applyBlc(uint16_t* rawImage, const imageInfo& info, const blackLevels& bls)
             }
 
             // value < 0 ? 0 : value
-            int corrected = (int)rawImage[idx] - black;
-            if (corrected < 0) {
-                corrected = 0;
-            }
-            rawImage[idx] = (uint16_t)corrected;
+            int corrected = static_cast<int>(rawImage[idx]) - black;
+            corrected = std::clamp(corrected, 0, 65535);
+            rawImage[idx] = static_cast<uint16_t>(corrected);
         
         }
     }

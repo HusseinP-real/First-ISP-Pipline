@@ -28,11 +28,21 @@ std::vector<std::vector<double>> init_spatial_weight_kernel(int radius, double s
     return kernel;
 }
 
-// single channel denoise
-void bilateral_filter_sub_image(const std::vector<uint16_t>& src, std::vector<uint16_t>& dst, 
-                        int w, int h, const std::vector<double>& range_lut,
-                         const std::vector<std::vector<double>>& spatial_kernel,
-                        int radius) {
+// Guided bilateral filter for a single channel
+void bilateral_filter_guided(const std::vector<uint16_t>& src,
+                             const std::vector<uint16_t>& guide,
+                             std::vector<uint16_t>& dst, 
+                             int w, int h,
+                             const std::vector<double>& range_lut,
+                             const std::vector<std::vector<double>>& spatial_kernel,
+                             int radius) {
+
+    // Basic sanity check: src 和 guide 尺寸必须一致
+    if (src.size() != guide.size()) {
+        std::cerr << "bilateral_filter_guided: src/guide size mismatch" << std::endl;
+        dst = src;
+        return;
+    }
 
     // Initialize output with input values (for edge handling)
     dst = src;
@@ -42,44 +52,52 @@ void bilateral_filter_sub_image(const std::vector<uint16_t>& src, std::vector<ui
         for (int x = radius; x < w - radius; x++) {
             double sum_weight = 0.0;
             double sum_value = 0.0;
-            uint16_t center_val = src[y * w + x];
+
+            int idx = y * w + x;
+            uint16_t center_val = src[idx];           // 要被平滑的数据
+            uint16_t guide_center_val = guide[idx];   // 引导图中心值
 
             // iterate each pixel in the kernel
             for (int ky = -radius; ky <= radius; ky++) {
                 for (int kx = -radius; kx <= radius; kx++) {
-                    uint16_t neighbor_val = src[(y + ky) * w + (x + kx)];
+                    int ny = y + ky;
+                    int nx = x + kx;
+                    int n_idx = ny * w + nx;
 
-                    // range weight
-                    int diff = std::abs(static_cast<int>(center_val) - static_cast<int>(neighbor_val));
+                    uint16_t neighbor_val = src[n_idx];           // 实际平滑的数据
+                    uint16_t guide_neighbor_val = guide[n_idx];   // 引导图邻居
+
+                    // === 核心：Range 权重用 guide 的差值 ===
+                    int diff = std::abs(static_cast<int>(guide_center_val) -
+                                        static_cast<int>(guide_neighbor_val));
                     if (diff >= static_cast<int>(range_lut.size())) {
                         diff = static_cast<int>(range_lut.size()) - 1;  // Clamp to valid range
                     }
                     double w_r = range_lut[diff];
 
-                    // get spatial weight
+                    // spatial weight
                     double w_s = spatial_kernel[ky + radius][kx + radius];
                     
                     double weight = w_r * w_s;
                     
-                    sum_value += neighbor_val * weight;
+                    sum_value += neighbor_val * weight;  // 累加的是 src 的值
                     sum_weight += weight;
                 }
             }
             
             // Avoid division by zero
             if (sum_weight > 0.0) {
-                dst[y * w + x] = static_cast<uint16_t>(std::round(sum_value / sum_weight));
+                dst[idx] = static_cast<uint16_t>(std::round(sum_value / sum_weight));
             }
         }
     }
-    
 }
 
 
 void runDenoise(const std::vector<uint16_t>& raw_input, std::vector<uint16_t>& raw_output, 
                 int width, int height) {
     double sigma_s = 2.0;
-    double sigma_r = 200.0;
+    double sigma_r = 30.0;
     int radius = 2;
 
     // Calculate sub-image dimensions (half size for each Bayer channel)
@@ -120,11 +138,20 @@ void runDenoise(const std::vector<uint16_t>& raw_input, std::vector<uint16_t>& r
         }
     }
 
-    // === Execute Filter on each channel ===
-    for (int k = 0; k < 4; ++k) {
-        bilateral_filter_sub_image(channels[k], channels_denoised[k], 
-                                SUB_W, SUB_H, rLUT, sKernel, radius);
-    }
+    // === Execute Guided Bilateral Filter ===
+    // Green 先自引导（结构“真相”在 G 上）
+    // BGGR: B=0, Gb=1, Gr=2, R=3
+    bilateral_filter_guided(channels[1], channels[1], channels_denoised[1],
+                            SUB_W, SUB_H, rLUT, sKernel, radius); // Gb self-guided
+    bilateral_filter_guided(channels[2], channels[2], channels_denoised[2],
+                            SUB_W, SUB_H, rLUT, sKernel, radius); // Gr self-guided
+
+    // 然后用已经降噪后的 G 通道作为引导，去平滑 B 和 R
+    // 这样四个通道在“哪里是边缘”上达成一致，避免 Edge Desynchronization
+    bilateral_filter_guided(channels[0], channels_denoised[1], channels_denoised[0],
+                            SUB_W, SUB_H, rLUT, sKernel, radius); // B guided by Gb
+    bilateral_filter_guided(channels[3], channels_denoised[2], channels_denoised[3],
+                            SUB_W, SUB_H, rLUT, sKernel, radius); // R guided by Gr
 
     // === Merge (Re-interleave) ===
     for (int y = 0; y < SUB_H; ++y) {

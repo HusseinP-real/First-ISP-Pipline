@@ -1,9 +1,11 @@
 #include "../core/raw_reader.h"
 #include "../core/blc.h"
+#include "../core/denoise.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
 #include "../core/demosiac.h"
 #include "../core/ccm.h"
+#include "../core/sharpen.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
@@ -30,24 +32,40 @@ int main() {
 
     // 2) 黑电平校正 BLC
     imageInfo info{width, height, 0};
-    blackLevels bls{135.f, 135.f, 135.f, 135.f}; // 与其他测试保持一致
+    blackLevels bls{240.f, 240.f, 240.f, 240.f}; // 与其他测试保持一致
     applyBlc(reinterpret_cast<uint16_t*>(raw.data), info, bls);
     std::cout << "BLC applied." << std::endl;
 
-    // 3) AWB
+    // 3) Denoise (降噪) - 在RAW域进行，BLC之后、AWB之前
+    std::cout << "Applying Denoise..." << std::endl;
+    std::vector<uint16_t> raw_vector(width * height);
+    std::vector<uint16_t> raw_denoised;
+    
+    // 将 cv::Mat 转换为 vector<uint16_t>
+    const uint16_t* raw_data = raw.ptr<uint16_t>(0);
+    std::copy(raw_data, raw_data + width * height, raw_vector.begin());
+    
+    // 执行降噪
+    runDenoise(raw_vector, raw_denoised, width, height);
+    
+    // 将降噪后的 vector 转换回 cv::Mat
+    uint16_t* raw_output_data = raw.ptr<uint16_t>(0);
+    std::copy(raw_denoised.begin(), raw_denoised.end(), raw_output_data);
+    std::cout << "Denoise applied." << std::endl;
+
+    // 4) AWB
     AWBGains gains{1.4f, 1.0f, 1.2f};
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 4) Demosaic (使用本地实现，BGGR -> BGR，保持 16-bit)
+    // 5) Demosaic (使用本地实现，BGGR -> BGR，保持 16-bit)
     cv::Mat color16;
     demosiac(raw, color16, BGGR);
     std::cout << "Demosaic done." << std::endl;
 
-    // 5) CCM: 颜色校正矩阵
+    // 6) CCM: 颜色校正矩阵（本次实验先关闭 CCM，直接用 demosaic 输出做后续处理）
     std::cout << "Applying Color Correction Matrix (CCM)..." << std::endl;
     
-    // 定义 CCM 矩阵
     float ccm_matrix[3][3] = {
         {1.546875f, -0.29296875f, -0.15625f},      // R_out
         {-0.3125f, 1.71484375f, -0.40625f},        // G_out
@@ -94,30 +112,46 @@ int main() {
         }
     }
 
-    // 6) Digital Gain (在 16-bit 阶段应用，保留更多精度和高光细节)
+    // 7) Digital Gain (在 16-bit 阶段应用，保留更多精度和高光细节)
     // 在 16-bit 阶段应用 gain 可以保留更多动态范围，避免在 8-bit 阶段损失精度
-    double gain = 8.0;
+    // 降低数字增益，通过gamma调整来补偿亮度
+    double gain = 6.0;  // 从12.0降低到6.0，减少直接亮度增益
     cv::Mat color16_gain;
-    // convertTo 会自动将结果 saturate 到 [0, 65535] 范围内
     color16_ccm.convertTo(color16_gain, CV_16UC3, gain);
     std::cout << "Digital gain applied (16-bit): " << gain << "x" << std::endl;
 
-    // 7) Gamma 校正 (16-bit -> 8-bit BGR)
+    // 8) Gamma 校正 (16-bit -> 16-bit, 仅曲线不降位深)
     GammaCorrection gamma;
-    cv::Mat color8;
-    gamma.run(color16_gain, color8);
-    if (color8.empty()) {
+    cv::Mat color16_gamma;
+    gamma.run16(color16_gain, color16_gamma);
+    if (color16_gamma.empty()) {
         std::cerr << "Gamma output is empty." << std::endl;
         return -1;
     }
     std::cout << "Gamma applied." << std::endl;
 
-    // 8) 保存结果
-    std::string outFile = "data/output/raw1_pipeline_gamma.png";
-    if (cv::imwrite(outFile, color8)) {
-        std::cout << "Saved: " << outFile << std::endl;
+    // 9) Sharpen (锐化)
+    std::cout << "Applying Sharpen (16-bit, post-gamma)..." << std::endl;
+    cv::Mat color16_gamma_sharpen = color16_gamma.clone();
+    // 注意：threshold 在 16-bit 域。这里先用 1280 作为起点，你可以再调（例如 512/768/1024/1536）
+    sharpen(color16_gamma_sharpen, 1.0f, 1, 1280);
+    std::cout << "Sharpen applied." << std::endl;
+
+    // 10) 直接输出 16-bit
+    // 16-bit PNG 在很多工具里都能直接打开/分析；如果你需要显示，再单独做 8-bit 映射即可。
+    std::string outFile16 = "data/output/raw1_pipeline_gamma_16bit.png";
+    std::string outFile16Sharpened = "data/output/raw1_pipeline_gamma_sharpened_16bit.png";
+
+    if (cv::imwrite(outFile16, color16_gamma)) {
+        std::cout << "Saved (gamma only, 16-bit): " << outFile16 << std::endl;
     } else {
-        std::cerr << "Failed to save: " << outFile << std::endl;
+        std::cerr << "Failed to save: " << outFile16 << std::endl;
+    }
+
+    if (cv::imwrite(outFile16Sharpened, color16_gamma_sharpen)) {
+        std::cout << "Saved (gamma + sharpen, 16-bit): " << outFile16Sharpened << std::endl;
+    } else {
+        std::cerr << "Failed to save: " << outFile16Sharpened << std::endl;
         return -1;
     }
 

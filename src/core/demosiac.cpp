@@ -14,8 +14,12 @@ void demosiac(const cv::Mat& raw, cv::Mat& dst, bayerPattern pattern) {
     cv::Mat padded_raw;
     cv::copyMakeBorder(raw, padded_raw, 2, 2, 2, 2, cv::BORDER_REFLECT_101);
 
-    // 初始化输出
-    dst = cv::Mat(raw.rows, raw.cols, CV_16UC3);
+    // Two-pass demosaic:
+    // 1) reconstruct full-resolution Green with edge-aware interpolation
+    // 2) reconstruct Red/Blue using color-difference (R-G, B-G) interpolation
+    //
+    // This significantly reduces zippering / false color compared to pure bilinear R/B.
+    cv::Mat G(raw.rows, raw.cols, CV_16UC1);
 
     int height = raw.rows;
     int width = raw.cols;
@@ -31,6 +35,7 @@ void demosiac(const cv::Mat& raw, cv::Mat& dst, bayerPattern pattern) {
         case GRBG: start_y = 0; start_x = 1; break;
     }
 
+    // ---- Pass 1: Green plane ----
     for (int y = 0; y < height; y++) {
         int py = y + 2;
 
@@ -40,8 +45,7 @@ void demosiac(const cv::Mat& raw, cv::Mat& dst, bayerPattern pattern) {
         const uint16_t* r_p1 = padded_raw.ptr<uint16_t>(py + 1);
         const uint16_t* r_p2 = padded_raw.ptr<uint16_t>(py + 2);
 
-        // 输出行指针 (Vec3w 对应 CV_16UC3，比裸指针操作更直观一点，或者继续用 uint16_t*)
-        cv::Vec3w* p_dst = dst.ptr<cv::Vec3w>(y);
+        uint16_t* gRow = G.ptr<uint16_t>(y);
 
         // 优化：将行奇偶性判断移出内层循环
         bool ye = ((y + start_y) & 1) == 0; 
@@ -56,14 +60,12 @@ void demosiac(const cv::Mat& raw, cv::Mat& dst, bayerPattern pattern) {
             // xe 为 true 代表列坐标（加上偏移后）是偶数
             bool xe = ((x & 1) ^ x_parity_start) == 0;
 
-            int b_val = 0, g_val = 0, r_val = 0;
-
             // --- G Channel 处理 ---
             // 逻辑简化：如果 (行偶且列奇) 或者 (行奇且列偶)，则是 G 像素
             // 等价于 ye != xe
             if (ye != xe) {
                 // 当前是 G 像素，直接拷贝
-                g_val = r_cur[px];
+                gRow[x] = r_cur[px];
             } else {
                 // 当前是 R 或 B 像素，需要插值 G
                 // 使用简单的 Hamilton-Adams 风格梯度判断
@@ -71,41 +73,76 @@ void demosiac(const cv::Mat& raw, cv::Mat& dst, bayerPattern pattern) {
                 int grad_v = std::abs((int)r_m2[px] - (int)r_p2[px]);
 
                 if (grad_h < grad_v) {
-                    g_val = (r_cur[px - 1] + r_cur[px + 1] + 1) / 2; // +1 用于四舍五入
+                    gRow[x] = static_cast<uint16_t>((r_cur[px - 1] + r_cur[px + 1] + 1) / 2); // +1 用于四舍五入
                 } else if (grad_v < grad_h) {
-                    g_val = (r_m1[px] + r_p1[px] + 1) / 2;
+                    gRow[x] = static_cast<uint16_t>((r_m1[px] + r_p1[px] + 1) / 2);
                 } else {
-                    g_val = (r_cur[px - 1] + r_cur[px + 1] + r_m1[px] + r_p1[px] + 2) / 4;
+                    gRow[x] = static_cast<uint16_t>((r_cur[px - 1] + r_cur[px + 1] + r_m1[px] + r_p1[px] + 2) / 4);
                 }
             }
+        }
+    }
 
-            // --- R / B Channel 处理 ---
+    // Pad G for easy neighbor access consistent with padded_raw indexing
+    cv::Mat padded_G;
+    cv::copyMakeBorder(G, padded_G, 2, 2, 2, 2, cv::BORDER_REFLECT_101);
+
+    // ---- Pass 2: Red/Blue via color-difference interpolation ----
+    dst = cv::Mat(raw.rows, raw.cols, CV_16UC3);
+    for (int y = 0; y < height; y++) {
+        int py = y + 2;
+
+        const uint16_t* r_m1 = padded_raw.ptr<uint16_t>(py - 1);
+        const uint16_t* r_cur = padded_raw.ptr<uint16_t>(py);
+        const uint16_t* r_p1 = padded_raw.ptr<uint16_t>(py + 1);
+
+        const uint16_t* g_m1 = padded_G.ptr<uint16_t>(py - 1);
+        const uint16_t* g_cur = padded_G.ptr<uint16_t>(py);
+        const uint16_t* g_p1 = padded_G.ptr<uint16_t>(py + 1);
+
+        cv::Vec3w* p_dst = dst.ptr<cv::Vec3w>(y);
+
+        bool ye = ((y + start_y) & 1) == 0;
+        int x_parity_start = (start_x) & 1;
+
+        for (int x = 0; x < width; x++) {
+            int px = x + 2;
+            bool xe = ((x & 1) ^ x_parity_start) == 0;
+
+            int g_val = static_cast<int>(g_cur[px]);
+            int r_val = 0;
+            int b_val = 0;
+
             if (ye && xe) {
-                // Case 1: (Even, Even) -> Red Pixel (基于 RGGB 逻辑)
-                r_val = r_cur[px];
-                // B 在对角线
-                b_val = (r_m1[px - 1] + r_m1[px + 1] + r_p1[px - 1] + r_p1[px + 1] + 2) / 4;
-            } 
-            else if (!ye && !xe) {
-                // Case 2: (Odd, Odd) -> Blue Pixel
-                b_val = r_cur[px];
-                // R 在对角线
-                r_val = (r_m1[px - 1] + r_m1[px + 1] + r_p1[px - 1] + r_p1[px + 1] + 2) / 4;
-            } 
-            else if (ye && !xe) {
-                // Case 3: (Even, Odd) -> Green Pixel (在 Red 行)
-                // 左右是 R，上下是 B
-                r_val = (r_cur[px - 1] + r_cur[px + 1] + 1) / 2;
-                b_val = (r_m1[px] + r_p1[px] + 1) / 2;
-            } 
-            else { 
-                // Case 4: (Odd, Even) -> Green Pixel (在 Blue 行)
-                // 左右是 B，上下是 R
-                b_val = (r_cur[px - 1] + r_cur[px + 1] + 1) / 2;
-                r_val = (r_m1[px] + r_p1[px] + 1) / 2;
+                // Red site: R known, B from diagonal (B-G) + G
+                r_val = static_cast<int>(r_cur[px]);
+                int d1 = static_cast<int>(r_m1[px - 1]) - static_cast<int>(g_m1[px - 1]);
+                int d2 = static_cast<int>(r_m1[px + 1]) - static_cast<int>(g_m1[px + 1]);
+                int d3 = static_cast<int>(r_p1[px - 1]) - static_cast<int>(g_p1[px - 1]);
+                int d4 = static_cast<int>(r_p1[px + 1]) - static_cast<int>(g_p1[px + 1]);
+                b_val = g_val + (d1 + d2 + d3 + d4 + 2) / 4;
+            } else if (!ye && !xe) {
+                // Blue site: B known, R from diagonal (R-G) + G
+                b_val = static_cast<int>(r_cur[px]);
+                int d1 = static_cast<int>(r_m1[px - 1]) - static_cast<int>(g_m1[px - 1]);
+                int d2 = static_cast<int>(r_m1[px + 1]) - static_cast<int>(g_m1[px + 1]);
+                int d3 = static_cast<int>(r_p1[px - 1]) - static_cast<int>(g_p1[px - 1]);
+                int d4 = static_cast<int>(r_p1[px + 1]) - static_cast<int>(g_p1[px + 1]);
+                r_val = g_val + (d1 + d2 + d3 + d4 + 2) / 4;
+            } else if (ye && !xe) {
+                // Green on Red row: R from left/right (R-G), B from up/down (B-G)
+                b_val = g_val + ((static_cast<int>(r_m1[px]) - static_cast<int>(g_m1[px])) +
+                                 (static_cast<int>(r_p1[px]) - static_cast<int>(g_p1[px])) + 1) / 2;
+                r_val = g_val + ((static_cast<int>(r_cur[px - 1]) - static_cast<int>(g_cur[px - 1])) +
+                                 (static_cast<int>(r_cur[px + 1]) - static_cast<int>(g_cur[px + 1])) + 1) / 2;
+            } else {
+                // Green on Blue row: B from left/right (B-G), R from up/down (R-G)
+                b_val = g_val + ((static_cast<int>(r_cur[px - 1]) - static_cast<int>(g_cur[px - 1])) +
+                                 (static_cast<int>(r_cur[px + 1]) - static_cast<int>(g_cur[px + 1])) + 1) / 2;
+                r_val = g_val + ((static_cast<int>(r_m1[px]) - static_cast<int>(g_m1[px])) +
+                                 (static_cast<int>(r_p1[px]) - static_cast<int>(g_p1[px])) + 1) / 2;
             }
 
-            // bgr order
             p_dst[x][0] = clip_val<uint16_t>(b_val);
             p_dst[x][1] = clip_val<uint16_t>(g_val);
             p_dst[x][2] = clip_val<uint16_t>(r_val);
