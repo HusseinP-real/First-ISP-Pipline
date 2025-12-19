@@ -24,11 +24,22 @@ public:
     // rawImage.depth() 必须为 CV_16U
     void run16(const cv::Mat& rawImage, cv::Mat& dst);
 
+    // 对 8-bit 图像做 gamma 校正并输出 8-bit 图像
+    // rawImage.depth() 必须为 CV_8U
+    void run8bit(const cv::Mat& rawImage, cv::Mat& dst);
+
+    // 16-bit 转 8-bit 并应用 gamma 校正（带抖动，减少色彩断层）
+    // rawImage.depth() 必须为 CV_16U
+    // 正确顺序：先在高位深(16-bit/float)上应用 sRGB 曲线，再在量化到 8-bit 时做 Floyd-Steinberg 误差扩散
+    void runWithDithering(const cv::Mat& rawImage, cv::Mat& dst);
+
 private:
     std::vector<uint8_t> lut8;     // 0-65535 -> 0-255 的查找表
     std::vector<uint16_t> lut16;   // 0-65535 -> 0-65535 的查找表
+    std::vector<uint8_t> lut8to8;  // 0-255 -> 0-255 的查找表（8-bit输入）
 
     // 生成固定的 sRGB LUT
     void createLut16to8();
     void createLut16to16();
+    void createLut8to8();
 };

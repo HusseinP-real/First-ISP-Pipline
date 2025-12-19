@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 int main() {
     // 基础参数
@@ -32,7 +33,7 @@ int main() {
 
     // 2) 黑电平校正 BLC
     imageInfo info{width, height, 0};
-    blackLevels bls{240.f, 240.f, 240.f, 240.f}; // 与其他测试保持一致
+    blackLevels bls{200.f, 200.f, 200.f, 200.f}; // 与其他测试保持一致
     applyBlc(reinterpret_cast<uint16_t*>(raw.data), info, bls);
     std::cout << "BLC applied." << std::endl;
 
@@ -115,43 +116,48 @@ int main() {
     // 7) Digital Gain (在 16-bit 阶段应用，保留更多精度和高光细节)
     // 在 16-bit 阶段应用 gain 可以保留更多动态范围，避免在 8-bit 阶段损失精度
     // 降低数字增益，通过gamma调整来补偿亮度
-    double gain = 6.0;  // 从12.0降低到6.0，减少直接亮度增益
+    double gain = 8.0;
     cv::Mat color16_gain;
     color16_ccm.convertTo(color16_gain, CV_16UC3, gain);
     std::cout << "Digital gain applied (16-bit): " << gain << "x" << std::endl;
 
-    // 8) Gamma 校正 (16-bit -> 16-bit, 仅曲线不降位深)
+    // 8) Gamma 校正（带抖动：16-bit -> 8-bit 转换 + gamma 校正）
+    // 使用抖动减少色彩断层，然后应用 gamma 曲线
     GammaCorrection gamma;
-    cv::Mat color16_gamma;
-    gamma.run16(color16_gain, color16_gamma);
-    if (color16_gamma.empty()) {
+    cv::Mat color8_gamma;
+    gamma.runWithDithering(color16_gain, color8_gamma);
+    if (color8_gamma.empty()) {
         std::cerr << "Gamma output is empty." << std::endl;
         return -1;
     }
-    std::cout << "Gamma applied." << std::endl;
+    std::cout << "Gamma applied with dithering (16-bit -> 8-bit + gamma=2.4)." << std::endl;
 
-    // 9) Sharpen (锐化)
-    std::cout << "Applying Sharpen (16-bit, post-gamma)..." << std::endl;
-    cv::Mat color16_gamma_sharpen = color16_gamma.clone();
-    // 注意：threshold 在 16-bit 域。这里先用 1280 作为起点，你可以再调（例如 512/768/1024/1536）
-    sharpen(color16_gamma_sharpen, 1.0f, 1, 1280);
+    // 9) Sharpen (锐化) - 需要16-bit，所以先转换回16-bit进行锐化，再转回8-bit
+    std::cout << "Applying Sharpen (post-gamma)..." << std::endl;
+    // 将8-bit转回16-bit进行锐化
+    cv::Mat color16_gamma_for_sharpen;
+    color8_gamma.convertTo(color16_gamma_for_sharpen, CV_16UC3, 65535.0/255.0);
+    // 注意：threshold 在 16-bit 域，使用 1280 作为阈值
+    sharpen(color16_gamma_for_sharpen, 1.0f, 1, 1280);
+    // 锐化后转回8-bit
+    cv::Mat color8_gamma_sharpen;
+    color16_gamma_for_sharpen.convertTo(color8_gamma_sharpen, CV_8UC3, 255.0/65535.0);
     std::cout << "Sharpen applied." << std::endl;
 
-    // 10) 直接输出 16-bit
-    // 16-bit PNG 在很多工具里都能直接打开/分析；如果你需要显示，再单独做 8-bit 映射即可。
-    std::string outFile16 = "data/output/raw1_pipeline_gamma_16bit.png";
-    std::string outFile16Sharpened = "data/output/raw1_pipeline_gamma_sharpened_16bit.png";
+    // 10) 输出 8-bit PNG
+    std::string outFile = "data/output/raw1_pipeline_gamma.png";
+    std::string outFileSharpened = "data/output/raw1_pipeline_gamma_sharpened.png";
 
-    if (cv::imwrite(outFile16, color16_gamma)) {
-        std::cout << "Saved (gamma only, 16-bit): " << outFile16 << std::endl;
+    if (cv::imwrite(outFile, color8_gamma)) {
+        std::cout << "Saved (gamma only, 8-bit): " << outFile << std::endl;
     } else {
-        std::cerr << "Failed to save: " << outFile16 << std::endl;
+        std::cerr << "Failed to save: " << outFile << std::endl;
     }
 
-    if (cv::imwrite(outFile16Sharpened, color16_gamma_sharpen)) {
-        std::cout << "Saved (gamma + sharpen, 16-bit): " << outFile16Sharpened << std::endl;
+    if (cv::imwrite(outFileSharpened, color8_gamma_sharpen)) {
+        std::cout << "Saved (gamma + sharpen, 8-bit): " << outFileSharpened << std::endl;
     } else {
-        std::cerr << "Failed to save: " << outFile16Sharpened << std::endl;
+        std::cerr << "Failed to save: " << outFileSharpened << std::endl;
         return -1;
     }
 
