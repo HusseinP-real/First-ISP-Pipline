@@ -3,9 +3,7 @@
 #include "../core/denoise.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
-#include "../core/demosiac.h"
 #include "../core/ccm.h"
-#include "../core/sharpen.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
@@ -13,8 +11,7 @@
 #include <algorithm>
 
 int main() {
-    // 基础参数
-    const std::string inputFile = "data/input/raw2.raw";
+    const std::string inputFile = "data/input/raw1.raw";
     const int width = 512;
     const int height = 500;
     const int frameIndex = 0;
@@ -33,7 +30,7 @@ int main() {
 
     // 2) 黑电平校正 BLC
     imageInfo info{width, height, 0};
-    blackLevels bls{200.f, 200.f, 200.f, 200.f}; // 与其他测试保持一致
+    blackLevels bls{200.f, 200.f, 200.f, 200.f};
     applyBlc(reinterpret_cast<uint16_t*>(raw.data), info, bls);
     std::cout << "BLC applied." << std::endl;
 
@@ -59,10 +56,10 @@ int main() {
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 5) Demosaic (使用本地实现，BGGR -> BGR，保持 16-bit)
+    // 5) Demosaic (使用 OpenCV，BGGR -> BGR，保持 16-bit)
     cv::Mat color16;
-    demosiac(raw, color16, BGGR);
-    std::cout << "Demosaic done." << std::endl;
+    cv::cvtColor(raw, color16, cv::COLOR_BayerBG2BGR);
+    std::cout << "Demosaic done (OpenCV)." << std::endl;
 
     // 6) CCM: 颜色校正矩阵（本次实验先关闭 CCM，直接用 demosaic 输出做后续处理）
     std::cout << "Applying Color Correction Matrix (CCM)..." << std::endl;
@@ -132,33 +129,12 @@ int main() {
     }
     std::cout << "Gamma applied with dithering (16-bit -> 8-bit + gamma=2.4)." << std::endl;
 
-    // 9) Sharpen (锐化) - 需要16-bit，所以先转换回16-bit进行锐化，再转回8-bit
-    std::cout << "Applying Sharpen (post-gamma)..." << std::endl;
-    // 将8-bit转回16-bit进行锐化
-    cv::Mat color16_gamma_for_sharpen;
-    color8_gamma.convertTo(color16_gamma_for_sharpen, CV_16UC3, 65535.0/255.0);
-    // 注意：threshold 在 16-bit 域，使用 1280 作为阈值
-    sharpen(color16_gamma_for_sharpen, 1.0f, 1, 1280);
-    // 锐化后转回8-bit
-    cv::Mat color8_gamma_sharpen;
-    color16_gamma_for_sharpen.convertTo(color8_gamma_sharpen, CV_8UC3, 255.0/65535.0);
-    std::cout << "Sharpen applied." << std::endl;
-
-    // 10) 输出 8-bit PNG
-    std::string outFile = "data/output/raw2_pipeline_gamma.png";
-    std::string outFileSharpened = "data/output/raw2_pipeline_gamma_sharpened.png";
-
+    // 9) 输出 8-bit PNG
+    std::string outFile = "data/output/raw1_pipeline_gamma.png";
     if (cv::imwrite(outFile, color8_gamma)) {
         std::cout << "Saved (gamma only, 8-bit): " << outFile << std::endl;
     } else {
         std::cerr << "Failed to save: " << outFile << std::endl;
-    }
-
-    if (cv::imwrite(outFileSharpened, color8_gamma_sharpen)) {
-        std::cout << "Saved (gamma + sharpen, 8-bit): " << outFileSharpened << std::endl;
-    } else {
-        std::cerr << "Failed to save: " << outFileSharpened << std::endl;
-        return -1;
     }
 
     return 0;
