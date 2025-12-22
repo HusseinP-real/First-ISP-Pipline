@@ -24,7 +24,7 @@ static void printMinMax(const cv::Mat& img, const std::string& name) {
 
 int main() {
     // 基础参数
-    const std::string inputFile = "data/input/raw1.raw";
+    const std::string inputFile = "data/input/raw6.raw";
     const int width = 512;
     const int height = 500;
     const int frameIndex = 0;
@@ -138,12 +138,25 @@ int main() {
 
     // 8) Demosaic 之后：先把线性 16-bit 量化到 8-bit（不做 gamma）
     //    然后在 8-bit 上做 gamma（更符合你当前想要的顺序）
+    //    【重要】必须考虑 AWB 和 CCM 对动态范围的扩展！
     const float gamma_value = 2.6f;  // gamma=2.6（增大 gamma 让图像变暗）
     GammaCorrection gamma(gamma_value);
     cv::Mat color8_linear;
-    // 固定 white level（避免"每帧自动拉伸到 255"导致怎么调 gain 都很亮）
-    // 从 raw1 的统计看：raw(before blc) max≈1009，非常像 10-bit（1023）。
-    constexpr float kWhiteLevel = 1023.0f;
+    
+    // 检测 CCM+Gain 后的实际数据范围
+    double minVal, maxVal;
+    cv::minMaxLoc(color16_gain.reshape(1), &minVal, &maxVal);
+    std::cout << "After CCM+Gain: min=" << minVal << " max=" << maxVal << std::endl;
+    
+    // 方法1: 使用固定的保守估计值（考虑 AWB*CCM 增益）
+    // 原始 10-bit (1023) × AWB最大(1.4) × CCM最大(1.7) ≈ 2435
+    // constexpr float kWhiteLevel = 2500.0f;
+    
+    // 方法2: 使用实际最大值（自适应，推荐）
+    // 留 5% 余量避免极端值导致 clip
+    const float kWhiteLevel = static_cast<float>(maxVal) * 1.05f;
+    std::cout << "Using adaptive white level: " << kWhiteLevel << std::endl;
+    
     const float scale16To8 = 255.0f / (kWhiteLevel * static_cast<float>(gain));
     std::cout << "Quantize scale16To8=" << scale16To8 << " (whiteLevel=" << kWhiteLevel << ", gain=" << gain << ")" << std::endl;
 
@@ -165,7 +178,7 @@ int main() {
     std::cout << "mean(BGR)=" << meanBGR[0] << "," << meanBGR[1] << "," << meanBGR[2] << std::endl;
 
     // 10) 输出 8-bit PNG（锐化暂时不需要）
-    std::string outFile = "data/output/raw1_pipeline_gamma.png";
+    std::string outFile = "data/output/raw6_pipeline_gamma.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
         std::cout << "Saved (gamma only, 8-bit): " << outFile << std::endl;

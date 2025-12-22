@@ -45,21 +45,28 @@ void GammaCorrection::run(const cv::Mat& rawImage, cv::Mat& dst) {
 }
 
 void GammaCorrection::createLut16to8() {
-    // 使用标准的 sRGB gamma 曲线 (gamma = 2.4)
+    // 使用可配置的 gamma 曲线
+    // gamma_value 越大，图像越暗；越小，图像越亮
     lut8.resize(65536);
     for (int i = 0; i < 65536; ++i) {
         float v = i / 65535.0f; // 归一化到 [0,1]
         float res = 0.0f;
 
-        // sRGB gamma 曲线
-        if (v <= 0.0031308f) {
+        // 使用 sRGB 风格的曲线，但用用户指定的 gamma 值
+        // 线性段阈值根据 gamma 值调整
+        const float linearThreshold = 0.0031308f;
+        const float linearScale = 12.92f;
+        
+        if (v <= linearThreshold) {
             // 线性段：抑制暗部噪声，同时保持暗部细节
-            res = 12.92f * v;
+            res = linearScale * v;
         } else {
-            // 使用标准的 gamma 值（1/2.4）
-            res = 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+            // 使用用户指定的 gamma 值
+            res = 1.055f * std::pow(v, 1.0f / gamma_value) - 0.055f;
         }
 
+        // 确保结果在 [0, 1] 范围内
+        res = std::max(0.0f, std::min(1.0f, res));
         lut8[i] = cv::saturate_cast<uint8_t>(res * 255.0f + 0.5f);
     }
 }
@@ -85,21 +92,26 @@ void GammaCorrection::run16(const cv::Mat& rawImage, cv::Mat& dst) {
 }
 
 void GammaCorrection::createLut16to16() {
-    // 使用标准的 sRGB gamma 曲线 (gamma = 2.4)
+    // 使用可配置的 gamma 曲线
     // 输出保持 16-bit 精度 [0, 65535]
     lut16.resize(65536);
     for (int i = 0; i < 65536; ++i) {
         float v = i / 65535.0f; // 归一化到 [0,1]
         float res = 0.0f;
 
-        // sRGB gamma 曲线
-        if (v <= 0.0031308f) {
-            res = 12.92f * v;
+        // 使用 sRGB 风格的曲线，但用用户指定的 gamma 值
+        const float linearThreshold = 0.0031308f;
+        const float linearScale = 12.92f;
+        
+        if (v <= linearThreshold) {
+            res = linearScale * v;
         } else {
-            // 使用标准的 gamma 值（1/2.4）
-            res = 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+            // 使用用户指定的 gamma 值
+            res = 1.055f * std::pow(v, 1.0f / gamma_value) - 0.055f;
         }
 
+        // 确保结果在 [0, 1] 范围内
+        res = std::max(0.0f, std::min(1.0f, res));
         // res in [0,1] -> [0,65535]
         int out = static_cast<int>(res * 65535.0f + 0.5f);
         lut16[i] = cv::saturate_cast<uint16_t>(out);
@@ -129,21 +141,26 @@ void GammaCorrection::run8bit(const cv::Mat& rawImage, cv::Mat& dst) {
 
 void GammaCorrection::createLut8to8() {
     // 对 8-bit 输入应用 gamma 曲线，输出 8-bit
-    // 使用标准的 sRGB gamma 曲线 (gamma = 2.4)
+    // 使用可配置的 gamma 值
     lut8to8.resize(256);
     for (int i = 0; i < 256; ++i) {
         float v = i / 255.0f; // 归一化到 [0,1]
         float res = 0.0f;
 
-        // sRGB gamma 曲线
-        if (v <= 0.0031308f) {
+        // 使用 sRGB 风格的曲线，但用用户指定的 gamma 值
+        const float linearThreshold = 0.0031308f;
+        const float linearScale = 12.92f;
+        
+        if (v <= linearThreshold) {
             // 线性段：抑制暗部噪声，同时保持暗部细节
-            res = 12.92f * v;
+            res = linearScale * v;
         } else {
-            // 使用标准的 gamma 值（1/2.4）
-            res = 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+            // 使用用户指定的 gamma 值
+            res = 1.055f * std::pow(v, 1.0f / gamma_value) - 0.055f;
         }
 
+        // 确保结果在 [0, 1] 范围内
+        res = std::max(0.0f, std::min(1.0f, res));
         lut8to8[i] = cv::saturate_cast<uint8_t>(res * 255.0f + 0.5f);
     }
 }
