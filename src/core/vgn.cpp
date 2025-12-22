@@ -6,7 +6,6 @@
 #include <limits>
 #include <vector>
 
-// 如果编译器支持 OpenMP，这将极大加速循环
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
@@ -156,7 +155,6 @@ static void vng_demosaic_bggr(const cv::Mat& src, cv::Mat& dst) {
                          0.5f * absf(r_p1[x-2] - r_p1[x]) + 0.5f * absf(r_m1[x-2] - r_m1[x]);
 
                 // NE, SE, NW, SW 对于 Green 像素来说更简单（对角线是同一种异色）
-                // 注意：这里原文的 Python 似乎在对角线计算上很简单
                 gra[4] = absf(r_m1[x+1]-r_p1[x-1]) + absf(r_m2[x+2]-val) + absf(r_m2[x+1]-r_0[x-1]) + absf(r_m1[x+2]-r_p1[x]);
                 gra[5] = absf(r_p1[x+1]-r_m1[x-1]) + absf(r_p2[x+2]-val) + absf(r_p1[x+2]-r_m1[x]) + absf(r_p2[x+1]-r_0[x-1]);
                 gra[6] = absf(r_m1[x-1]-r_p1[x+1]) + absf(r_m2[x-2]-val) + absf(r_m2[x-1]-r_0[x+1]) + absf(r_m1[x-2]-r_p1[x]);
@@ -172,7 +170,8 @@ static void vng_demosaic_bggr(const cv::Mat& src, cv::Mat& dst) {
             // ================= 插值计算 =================
             // 这是一个小型的 Switch 结构，遍历 8 个方向
             for (int k = 0; k < 8; ++k) {
-                if (gra[k] >= T) continue; // 只选梯度小的方向
+                // 梯度太大
+                if (gra[k] >= T) continue;
 
                 float r=0, g=0, b=0;
 
@@ -305,5 +304,43 @@ void demosiacVNG(const cv::Mat& raw, cv::Mat& dst, bayerPattern pattern) {
     CV_Assert(!raw.empty());
     CV_Assert(raw.channels() == 1);
     CV_Assert(pattern == BGGR && "Current optimized VNG only supports BGGR.");
-    vng_demosaic_bggr(raw, dst);
+
+    // 先用一个“边界稳定”的 demosaic 作为兜底（本项目自带 HA-style demosaic，边界用 REFLECT_101 pad）
+    // 再用 VNG 的结果覆盖中间区域，避免 VNG 在边缘 2px 没有 5x5 窗口导致的“边角发灰/颜色混在一起”。
+    cv::Mat base;
+    demosiac(raw, base, pattern); // CV_16UC3 / CV_8UC3
+
+    cv::Mat vng;
+    vng_demosaic_bggr(raw, vng);
+
+    // 用 VNG 覆盖 interior（忽略边缘 2 像素）
+    base.copyTo(dst);
+    const int y0 = 2;
+    const int y1 = raw.rows - 2;
+    const int x0 = 2;
+    const int x1 = raw.cols - 2;
+
+    for (int y = y0; y < y1; ++y) {
+        const uint16_t* vrow16 = (vng.depth() == CV_16U) ? vng.ptr<uint16_t>(y) : nullptr;
+        uint16_t* drow16 = (dst.depth() == CV_16U) ? dst.ptr<uint16_t>(y) : nullptr;
+        const uint8_t* vrow8 = (vng.depth() == CV_8U) ? vng.ptr<uint8_t>(y) : nullptr;
+        uint8_t* drow8 = (dst.depth() == CV_8U) ? dst.ptr<uint8_t>(y) : nullptr;
+
+        if (vrow16 && drow16) {
+            for (int x = x0; x < x1; ++x) {
+                drow16[x * 3 + 0] = vrow16[x * 3 + 0];
+                drow16[x * 3 + 1] = vrow16[x * 3 + 1];
+                drow16[x * 3 + 2] = vrow16[x * 3 + 2];
+            }
+        } else if (vrow8 && drow8) {
+            for (int x = x0; x < x1; ++x) {
+                drow8[x * 3 + 0] = vrow8[x * 3 + 0];
+                drow8[x * 3 + 1] = vrow8[x * 3 + 1];
+                drow8[x * 3 + 2] = vrow8[x * 3 + 2];
+            }
+        } else {
+            // 不应发生：vng/base/dst 位深应一致
+            CV_Assert(false && "Unexpected depth mismatch in demosiacVNG");
+        }
+    }
 }

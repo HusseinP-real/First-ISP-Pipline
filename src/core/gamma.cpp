@@ -4,10 +4,17 @@
 
 
 
-GammaCorrection::GammaCorrection() {
+GammaCorrection::GammaCorrection(float gamma) : gamma_value(gamma) {
     createLut16to8();
     createLut16to16();
     createLut8to8();
+}
+
+void GammaCorrection::setGamma(float gamma) {
+    if (gamma_value != gamma) {
+        gamma_value = gamma;
+        updateGamma();
+    }
 }
 
 void GammaCorrection::updateGamma() {
@@ -197,6 +204,65 @@ void GammaCorrection::runWithDithering(const cv::Mat& rawImage, cv::Mat& dst) {
                     next_err_row[x * 3 + c] += quant_error * (5.0f / 16.0f);
                     // down-right
                     if (x + 1 < rawImage.cols) {
+                        next_err_row[(x + 1) * 3 + c] += quant_error * (1.0f / 16.0f);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void GammaCorrection::quantize16to8WithDithering(const cv::Mat& linear16, cv::Mat& dst8, float scale16To8) {
+    if (linear16.empty()) return;
+    CV_Assert(linear16.depth() == CV_16U);
+    CV_Assert(linear16.channels() == 3); // 目前只支持 3 通道（与 pipeline 一致）
+
+    if (!(scale16To8 > 0.0f)) {
+        // scale 非法时避免 NaN/全黑
+        scale16To8 = 255.0f / 65535.0f;
+    }
+
+    dst8.create(linear16.size(), CV_8UC3);
+
+    // 误差缓冲（float），用于量化到 8-bit 时做 Floyd-Steinberg 误差扩散
+    cv::Mat error = cv::Mat::zeros(linear16.size(), CV_32FC3);
+
+    for (int y = 0; y < linear16.rows; y++) {
+        const uint16_t* src_row = linear16.ptr<uint16_t>(y);
+        uint8_t* dst_row = dst8.ptr<uint8_t>(y);
+        float* err_row = error.ptr<float>(y);
+        float* next_err_row = (y + 1 < linear16.rows) ? error.ptr<float>(y + 1) : nullptr;
+
+        for (int x = 0; x < linear16.cols; x++) {
+            for (int c = 0; c < 3; c++) {
+                const uint16_t v_linear16 = src_row[x * 3 + c];
+
+                // map to [0..255] (float) + accumulated error
+                const float target_val = static_cast<float>(v_linear16) * scale16To8 + err_row[x * 3 + c];
+
+                // quantize to 8-bit
+                int quantized = static_cast<int>(target_val + 0.5f);
+                quantized = std::max(0, std::min(255, quantized));
+                dst_row[x * 3 + c] = static_cast<uint8_t>(quantized);
+
+                // error diffusion (Floyd-Steinberg)
+                const float quant_error = target_val - static_cast<float>(quantized);
+
+                // right
+                if (x + 1 < linear16.cols) {
+                    err_row[(x + 1) * 3 + c] += quant_error * (7.0f / 16.0f);
+                }
+
+                // down row
+                if (next_err_row) {
+                    // down-left
+                    if (x > 0) {
+                        next_err_row[(x - 1) * 3 + c] += quant_error * (3.0f / 16.0f);
+                    }
+                    // down
+                    next_err_row[x * 3 + c] += quant_error * (5.0f / 16.0f);
+                    // down-right
+                    if (x + 1 < linear16.cols) {
                         next_err_row[(x + 1) * 3 + c] += quant_error * (1.0f / 16.0f);
                     }
                 }

@@ -5,7 +5,6 @@
 #include "../core/gamma.h"
 #include "../core/vgn.h"
 #include "../core/ccm.h"
-#include "../core/sharpen.h"
 
 #include <opencv2/opencv.hpp>
 #include <algorithm>
@@ -101,20 +100,30 @@ int main() {
     }
 
     // 7) Digital Gain
-    double gain = 8.0;
+    // Digital gain（设为 1.0 等价于“去掉增益”）
+    double gain = 1.0;
     cv::Mat color16_gain;
     color16_ccm.convertTo(color16_gain, CV_16UC3, gain);
     std::cout << "Digital gain applied (16-bit): " << gain << "x" << std::endl;
 
-    // 8) Gamma with dithering
-    GammaCorrection gamma;
+    // 8) Demosaic 之后：先把线性 16-bit 量化到 8-bit（不做 gamma）
+    //    - 用自适应 scale 避免"把 10/12-bit 当 16-bit"导致整体偏暗
+    //    - 用抖动量化减少断层/色带
+    const float gamma_value = 2.6f;  // gamma=2.6（增大 gamma 让图像变暗）
+    GammaCorrection gamma(gamma_value);
+    cv::Mat color8_linear;
+    constexpr float kWhiteLevel = 1023.0f; // raw1 很像 10-bit
+    const float scale16To8 = 255.0f / (kWhiteLevel * static_cast<float>(gain));
+    gamma.quantize16to8WithDithering(color16_gain, color8_linear, scale16To8);
+
+    // 9) Gamma（8-bit -> 8-bit）
     cv::Mat color8_gamma;
-    gamma.runWithDithering(color16_gain, color8_gamma);
+    gamma.run8bit(color8_linear, color8_gamma);
     if (color8_gamma.empty()) {
         std::cerr << "Gamma output is empty." << std::endl;
         return -1;
     }
-    std::cout << "Gamma applied with dithering (16-bit -> 8-bit + gamma=2.4)." << std::endl;
+    std::cout << "Gamma applied (8-bit -> 8-bit, gamma=" << gamma_value << ")." << std::endl;
 
     // // 9) Sharpen
     // std::cout << "Applying Sharpen (post-gamma)..." << std::endl;
@@ -127,7 +136,7 @@ int main() {
 
     // 10) 输出
     std::string outFile = "data/output/raw1_pipeline_vng_gamma.png";
-    std::string outFileSharpened = "data/output/raw1_pipeline_vng_gamma_sharpened.png";
+    // std::string outFileSharpened = "data/output/raw2_pipeline_vng_gamma_sharpened.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
         std::cout << "Saved (VNG + gamma, 8-bit): " << outFile << std::endl;
