@@ -3,7 +3,6 @@
 #include "../core/denoise.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
-#include "../core/vng.h"
 #include "../core/ccm.h"
 
 #include <opencv2/opencv.hpp>
@@ -56,10 +55,28 @@ int main() {
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 5) Demosaic (VNG, BGGR -> BGR, 保持 16-bit)
+    // 5) Demosaic (OpenCV 官方 VNG，BGGR)
+    // OpenCV VNG 只支持 8-bit 输入，这里按实际动态范围缩放 16->8，再缩放回 16-bit
     cv::Mat color16;
-    demosiacVNG(raw, color16, BGGR);
-    std::cout << "Demosaic done (VNG)." << std::endl;
+    {
+        double minValRaw, maxValRaw;
+        cv::minMaxLoc(raw, &minValRaw, &maxValRaw);
+        if (maxValRaw <= 0) {
+            std::cerr << "Invalid max value after AWB: " << maxValRaw << std::endl;
+            return -1;
+        }
+        const double scale_16_to_8 = 255.0 / maxValRaw;
+        const double scale_8_to_16 = maxValRaw / 255.0;
+
+        cv::Mat raw8;
+        raw.convertTo(raw8, CV_8UC1, scale_16_to_8);
+
+        cv::Mat color8;
+        cv::cvtColor(raw8, color8, cv::COLOR_BayerRG2BGR_VNG);
+        std::cout << "Demosaic done (OpenCV VNG, BGGR)." << std::endl;
+
+        color8.convertTo(color16, CV_16UC3, scale_8_to_16);
+    }
 
     // 6) CCM
     std::cout << "Applying Color Correction Matrix (CCM)..." << std::endl;
@@ -110,7 +127,7 @@ int main() {
     //    - 用自适应 scale 避免"把 10/12-bit 当 16-bit"导致整体偏暗
     //    - 用抖动量化减少断层/色带
     //    - 【重要】必须考虑 AWB 和 CCM 对动态范围的扩展！
-    const float gamma_value = 2.2f;  // gamma=2.6（增大 gamma 让图像变暗）
+    const float gamma_value = 2.6f;  // 与 test_vng.cpp 对齐
     GammaCorrection gamma(gamma_value);
     cv::Mat color8_linear;
     
@@ -151,7 +168,7 @@ int main() {
     // std::cout << "Sharpen applied." << std::endl;
 
     // 10) 输出
-    std::string outFile = "data/output/raw6_pipeline_vng_gamma.png";
+    std::string outFile = "data/output/raw6_pipeline_vng_opencv_gamma.png";
     // std::string outFileSharpened = "data/output/raw2_pipeline_vng_gamma_sharpened.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {

@@ -21,11 +21,14 @@ CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp \
                $(CORE_DIR)/awb.cpp \
                $(CORE_DIR)/gamma.cpp \
                $(CORE_DIR)/demosiac.cpp \
-               $(CORE_DIR)/vgn.cpp \
+               $(CORE_DIR)/vng.cpp \
+               $(CORE_DIR)/ahd.cpp \
                $(CORE_DIR)/ccm.cpp \
                $(CORE_DIR)/sharpen.cpp
 TEST_SOURCES = $(TESTS_DIR)/test_gamma.cpp \
-               $(TESTS_DIR)/test_vng.cpp
+               $(TESTS_DIR)/test_vng.cpp \
+               $(TESTS_DIR)/test_vng_opencv.cpp \
+               $(TESTS_DIR)/test_ahd.cpp
 
 # 目标文件
 CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
@@ -34,14 +37,17 @@ CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
                $(BUILD_DIR)/awb.o \
                $(BUILD_DIR)/gamma.o \
                $(BUILD_DIR)/demosiac.o \
-               $(BUILD_DIR)/vgn.o \
+               $(BUILD_DIR)/vng.o \
+               $(BUILD_DIR)/ahd.o \
                $(BUILD_DIR)/ccm.o \
                $(BUILD_DIR)/sharpen.o
 TEST_GAMMA_TARGET = $(BUILD_DIR)/test_gamma
 TEST_VNG_TARGET = $(BUILD_DIR)/test_vng
+TEST_VNG_OPENCV_TARGET = $(BUILD_DIR)/test_vng_opencv
+TEST_AHD_TARGET = $(BUILD_DIR)/test_ahd
 
 # 默认目标
-all: $(TEST_GAMMA_TARGET) $(TEST_VNG_TARGET)
+all: $(TEST_GAMMA_TARGET) $(TEST_VNG_TARGET) $(TEST_VNG_OPENCV_TARGET) $(TEST_AHD_TARGET)
 
 # 创建构建目录
 $(BUILD_DIR):
@@ -66,7 +72,10 @@ $(BUILD_DIR)/gamma.o: $(CORE_DIR)/gamma.cpp $(CORE_DIR)/gamma.h | $(BUILD_DIR)
 $(BUILD_DIR)/demosiac.o: $(CORE_DIR)/demosiac.cpp $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/vgn.o: $(CORE_DIR)/vgn.cpp $(CORE_DIR)/vgn.h $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
+$(BUILD_DIR)/vng.o: $(CORE_DIR)/vng.cpp $(CORE_DIR)/vng.h $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/ahd.o: $(CORE_DIR)/ahd.cpp $(CORE_DIR)/ahd.h $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/ccm.o: $(CORE_DIR)/ccm.cpp $(CORE_DIR)/ccm.h | $(BUILD_DIR)
@@ -82,12 +91,24 @@ $(TEST_GAMMA_TARGET): $(TESTS_DIR)/test_gamma.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 $(TEST_VNG_TARGET): $(TESTS_DIR)/test_vng.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
 
+$(TEST_VNG_OPENCV_TARGET): $(TESTS_DIR)/test_vng_opencv.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
+
+$(TEST_AHD_TARGET): $(TESTS_DIR)/test_ahd.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
+
 # 运行测试
 run-gamma: $(TEST_GAMMA_TARGET)
 	./$(TEST_GAMMA_TARGET)
 
 run-vng: $(TEST_VNG_TARGET)
 	./$(TEST_VNG_TARGET)
+
+run-vng-opencv: $(TEST_VNG_OPENCV_TARGET)
+	./$(TEST_VNG_OPENCV_TARGET)
+
+run-ahd: $(TEST_AHD_TARGET)
+	./$(TEST_AHD_TARGET)
 
 # 清理
 clean:
@@ -96,11 +117,13 @@ clean:
 # 帮助信息
 help:
 	@echo "Available targets:"
-	@echo "  make          - Build test_gamma + test_vng"
-	@echo "  make run-gamma   - Build and run test_gamma"
-	@echo "  make run-vng     - Build and run test_vng"
-	@echo "  make clean       - Remove build files"
-	@echo "  make help        - Show this help message"
+	@echo "  make              - Build test_gamma + test_vng + test_vng_opencv + test_ahd"
+	@echo "  make run-gamma       - Build and run test_gamma"
+	@echo "  make run-vng         - Build and run test_vng"
+	@echo "  make run-vng-opencv  - Build and run test_vng_opencv"
+	@echo "  make run-ahd         - Build and run test_ahd"
+	@echo "  make clean           - Remove build files"
+	@echo "  make help            - Show this help message"
 
-.PHONY: all run-gamma run-vng clean help
+.PHONY: all run-gamma run-vng run-vng-opencv run-ahd clean help
 

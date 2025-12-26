@@ -1,4 +1,4 @@
-#include "vgn.h"
+#include "vng.h"
 
 #include <opencv2/opencv.hpp>
 #include <algorithm>

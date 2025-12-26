@@ -3,7 +3,7 @@
 #include "../core/denoise.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
-#include "../core/vng.h"
+#include "../core/ahd.h"
 #include "../core/ccm.h"
 
 #include <opencv2/opencv.hpp>
@@ -14,7 +14,7 @@
 
 int main() {
     // 基础参数
-    const std::string inputFile = "data/input/raw6.raw";
+    const std::string inputFile = "data/input/raw5.raw";
     const int width = 512;
     const int height = 500;
     const int frameIndex = 0;
@@ -56,10 +56,10 @@ int main() {
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 5) Demosaic (VNG, BGGR -> BGR, 保持 16-bit)
+    // 5) Demosaic (AHD, BGGR -> BGR, 保持 16-bit)
     cv::Mat color16;
-    demosiacVNG(raw, color16, BGGR);
-    std::cout << "Demosaic done (VNG)." << std::endl;
+    demosiacAHD(raw, color16, BGGR);
+    std::cout << "Demosaic done (AHD)." << std::endl;
 
     // 6) CCM
     std::cout << "Applying Color Correction Matrix (CCM)..." << std::endl;
@@ -100,7 +100,7 @@ int main() {
     }
 
     // 7) Digital Gain
-    // Digital gain（设为 1.0 等价于“去掉增益”）
+    // Digital gain（设为 1.0 等价于"去掉增益"）
     double gain = 1.0;
     cv::Mat color16_gain;
     color16_ccm.convertTo(color16_gain, CV_16UC3, gain);
@@ -110,7 +110,7 @@ int main() {
     //    - 用自适应 scale 避免"把 10/12-bit 当 16-bit"导致整体偏暗
     //    - 用抖动量化减少断层/色带
     //    - 【重要】必须考虑 AWB 和 CCM 对动态范围的扩展！
-    const float gamma_value = 2.2f;  // gamma=2.6（增大 gamma 让图像变暗）
+    const float gamma_value = 2.2f;  // gamma=2.2（标准 gamma 值）
     GammaCorrection gamma(gamma_value);
     cv::Mat color8_linear;
     
@@ -141,7 +141,7 @@ int main() {
     }
     std::cout << "Gamma applied (8-bit -> 8-bit, gamma=" << gamma_value << ")." << std::endl;
 
-    // // 9) Sharpen
+    // // 10) Sharpen (可选)
     // std::cout << "Applying Sharpen (post-gamma)..." << std::endl;
     // cv::Mat color16_gamma_for_sharpen;
     // color8_gamma.convertTo(color16_gamma_for_sharpen, CV_16UC3, 65535.0 / 255.0);
@@ -150,18 +150,18 @@ int main() {
     // color16_gamma_for_sharpen.convertTo(color8_gamma_sharpen, CV_8UC3, 255.0 / 65535.0);
     // std::cout << "Sharpen applied." << std::endl;
 
-    // 10) 输出
-    std::string outFile = "data/output/raw6_pipeline_vng_gamma.png";
-    // std::string outFileSharpened = "data/output/raw2_pipeline_vng_gamma_sharpened.png";
+    // 11) 输出
+    std::string outFile = "data/output/raw5_pipeline_ahd_gamma.png";
+    // std::string outFileSharpened = "data/output/raw6_pipeline_ahd_gamma_sharpened.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
-        std::cout << "Saved (VNG + gamma, 8-bit): " << outFile << std::endl;
+        std::cout << "Saved (AHD + gamma, 8-bit): " << outFile << std::endl;
     } else {
         std::cerr << "Failed to save: " << outFile << std::endl;
     }
 
     // if (cv::imwrite(outFileSharpened, color8_gamma_sharpen)) {
-    //     std::cout << "Saved (VNG + gamma + sharpen, 8-bit): " << outFileSharpened << std::endl;
+    //     std::cout << "Saved (AHD + gamma + sharpen, 8-bit): " << outFileSharpened << std::endl;
     // } else {
     //     std::cerr << "Failed to save: " << outFileSharpened << std::endl;
     //     return -1;
@@ -169,5 +169,4 @@ int main() {
 
     return 0;
 }
-
 
