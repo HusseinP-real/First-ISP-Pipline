@@ -24,7 +24,7 @@ static void printMinMax(const cv::Mat& img, const std::string& name) {
 
 int main() {
     // 基础参数
-    const std::string inputFile = "data/input/raw6.raw";
+    const std::string inputFile = "data/input/raw1.raw";
     const int width = 512;
     const int height = 500;
     const int frameIndex = 0;
@@ -178,7 +178,7 @@ int main() {
     std::cout << "mean(BGR)=" << meanBGR[0] << "," << meanBGR[1] << "," << meanBGR[2] << std::endl;
 
     // 10) 输出 8-bit PNG（锐化暂时不需要）
-    std::string outFile = "data/output/raw6_pipeline_gamma.png";
+    std::string outFile = "data/output/raw1_pipeline_gamma.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
         std::cout << "Saved (gamma only, 8-bit): " << outFile << std::endl;

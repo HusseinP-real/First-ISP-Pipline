@@ -3,7 +3,7 @@
 #include "../core/denoise.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
-#include "../core/vng.h"
+#include "../core/amazefromgithub.h"
 #include "../core/ccm.h"
 
 #include <opencv2/opencv.hpp>
@@ -56,10 +56,10 @@ int main() {
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 5) Demosaic (VNG, BGGR -> BGR, 保持 16-bit)
+    // 5) Demosaic (AMaZE From GitHub 算法, BGGR -> BGR, 保持 16-bit)
     cv::Mat color16;
-    demosiacVNG(raw, color16, BGGR);
-    std::cout << "Demosaic done (VNG)." << std::endl;
+    demosiacAMaZEFromGitHub(raw, color16, BGGR);
+    std::cout << "Demosaic done (AMaZE From GitHub)." << std::endl;
 
     // 6) CCM
     std::cout << "Applying Color Correction Matrix (CCM)..." << std::endl;
@@ -100,31 +100,20 @@ int main() {
     }
 
     // 7) Digital Gain
-    // Digital gain（设为 1.0 等价于“去掉增益”）
     double gain = 1.0;
     cv::Mat color16_gain;
     color16_ccm.convertTo(color16_gain, CV_16UC3, gain);
     std::cout << "Digital gain applied (16-bit): " << gain << "x" << std::endl;
 
-    // 8) Demosaic 之后：先把线性 16-bit 量化到 8-bit（不做 gamma）
-    //    - 用自适应 scale 避免"把 10/12-bit 当 16-bit"导致整体偏暗
-    //    - 用抖动量化减少断层/色带
-    //    - 【重要】必须考虑 AWB 和 CCM 对动态范围的扩展！
-    const float gamma_value = 2.2f;  // gamma=2.6（增大 gamma 让图像变暗）
+    // 8) 量化到 8-bit
+    const float gamma_value = 2.2f;
     GammaCorrection gamma(gamma_value);
     cv::Mat color8_linear;
     
-    // 检测 CCM+Gain 后的实际数据范围
     double minVal, maxVal;
     cv::minMaxLoc(color16_gain.reshape(1), &minVal, &maxVal);
     std::cout << "After CCM+Gain: min=" << minVal << " max=" << maxVal << std::endl;
     
-    // 方法1: 使用固定的保守估计值（考虑 AWB*CCM 增益）
-    // 原始 10-bit (1023) × AWB最大(1.4) × CCM最大(1.7) ≈ 2435
-    // constexpr float kWhiteLevel = 2500.0f;
-    
-    // 方法2: 使用实际最大值（自适应，推荐）
-    // 留 5% 余量避免极端值导致 clip
     const float kWhiteLevel = static_cast<float>(maxVal) * 1.05f;
     std::cout << "Using adaptive white level: " << kWhiteLevel << std::endl;
     
@@ -141,33 +130,15 @@ int main() {
     }
     std::cout << "Gamma applied (8-bit -> 8-bit, gamma=" << gamma_value << ")." << std::endl;
 
-    // // 9) Sharpen
-    // std::cout << "Applying Sharpen (post-gamma)..." << std::endl;
-    // cv::Mat color16_gamma_for_sharpen;
-    // color8_gamma.convertTo(color16_gamma_for_sharpen, CV_16UC3, 65535.0 / 255.0);
-    // sharpen(color16_gamma_for_sharpen, 1.0f, 1, 1280);
-    // cv::Mat color8_gamma_sharpen;
-    // color16_gamma_for_sharpen.convertTo(color8_gamma_sharpen, CV_8UC3, 255.0 / 65535.0);
-    // std::cout << "Sharpen applied." << std::endl;
-
     // 10) 输出
-    std::string outFile = "data/output/raw4_pipeline_vng_gamma.png";
-    // std::string outFileSharpened = "data/output/raw2_pipeline_vng_gamma_sharpened.png";
+    std::string outFile = "data/output/raw4_pipeline_amazefromgithub_gamma.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
-        std::cout << "Saved (VNG + gamma, 8-bit): " << outFile << std::endl;
+        std::cout << "Saved (AMaZE From GitHub + gamma, 8-bit): " << outFile << std::endl;
     } else {
         std::cerr << "Failed to save: " << outFile << std::endl;
     }
 
-    // if (cv::imwrite(outFileSharpened, color8_gamma_sharpen)) {
-    //     std::cout << "Saved (VNG + gamma + sharpen, 8-bit): " << outFileSharpened << std::endl;
-    // } else {
-    //     std::cerr << "Failed to save: " << outFileSharpened << std::endl;
-    //     return -1;
-    // }
-
     return 0;
 }
-
 
