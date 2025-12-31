@@ -14,7 +14,7 @@
 
 int main() {
     // 基础参数
-    const std::string inputFile = "data/input/raw4.raw";
+    const std::string inputFile = "data/input/raw6.raw";
     const int width = 512;
     const int height = 500;
     const int frameIndex = 0;
@@ -131,7 +131,7 @@ int main() {
     std::cout << "Gamma applied (8-bit -> 8-bit, gamma=" << gamma_value << ")." << std::endl;
 
     // 10) 输出
-    std::string outFile = "data/output/raw4_pipeline_amazefromgithub_gamma.png";
+    std::string outFile = "data/output/raw6_pipeline_amazefromgithub_gamma.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
         std::cout << "Saved (AMaZE From GitHub + gamma, 8-bit): " << outFile << std::endl;

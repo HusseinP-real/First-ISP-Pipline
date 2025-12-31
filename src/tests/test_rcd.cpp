@@ -3,7 +3,7 @@
 #include "../core/denoise.h"
 #include "../core/awb.h"
 #include "../core/gamma.h"
-#include "../core/AMaZE.h"
+#include "../core/rcd.h"
 #include "../core/ccm.h"
 
 #include <opencv2/opencv.hpp>
@@ -56,10 +56,10 @@ int main() {
     runAWB(raw, gains, false);
     std::cout << "[Manual AWB] Gains: R=" << gains.r << " G=" << gains.g << " B=" << gains.b << std::endl;
 
-    // 5) Demosaic (AMaZE, BGGR -> BGR, 保持 16-bit)
+    // 5) Demosaic (RCD, BGGR -> BGR, 保持 16-bit)
     cv::Mat color16;
-    demosiacAMaZE(raw, color16, BGGR);
-    std::cout << "Demosaic done (AMaZE)." << std::endl;
+    demosiacRCD(raw, color16, BGGR);
+    std::cout << "Demosaic done (RCD)." << std::endl;
 
     // 6) CCM
     std::cout << "Applying Color Correction Matrix (CCM)..." << std::endl;
@@ -131,14 +131,13 @@ int main() {
     std::cout << "Gamma applied (8-bit -> 8-bit, gamma=" << gamma_value << ")." << std::endl;
 
     // 10) 输出
-    std::string outFile = "data/output/raw6_pipeline_amaze_gamma.png";
+    std::string outFile = "data/output/raw6_pipeline_rcd_gamma.png";
 
     if (cv::imwrite(outFile, color8_gamma)) {
-        std::cout << "Saved (AMaZE + gamma, 8-bit): " << outFile << std::endl;
+        std::cout << "Saved (RCD + gamma, 8-bit): " << outFile << std::endl;
     } else {
         std::cerr << "Failed to save: " << outFile << std::endl;
     }
 
     return 0;
 }
-

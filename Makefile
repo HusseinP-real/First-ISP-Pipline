@@ -26,6 +26,7 @@ CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp \
                $(CORE_DIR)/AMaZE.cpp \
                $(CORE_DIR)/amazevng.cpp \
                $(CORE_DIR)/amazefromgithub.cpp \
+               $(CORE_DIR)/rcd.cpp \
                $(CORE_DIR)/ccm.cpp \
                $(CORE_DIR)/sharpen.cpp
 TEST_SOURCES = $(TESTS_DIR)/test_gamma.cpp \
@@ -34,7 +35,8 @@ TEST_SOURCES = $(TESTS_DIR)/test_gamma.cpp \
                $(TESTS_DIR)/test_ahd.cpp \
                $(TESTS_DIR)/test_amaze.cpp \
                $(TESTS_DIR)/test_amazevng.cpp \
-               $(TESTS_DIR)/test_amazefromgithub.cpp
+               $(TESTS_DIR)/test_amazefromgithub.cpp \
+               $(TESTS_DIR)/test_rcd.cpp
 
 # 目标文件
 CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
@@ -48,6 +50,7 @@ CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
                $(BUILD_DIR)/AMaZE.o \
                $(BUILD_DIR)/amazevng.o \
                $(BUILD_DIR)/amazefromgithub.o \
+               $(BUILD_DIR)/rcd.o \
                $(BUILD_DIR)/ccm.o \
                $(BUILD_DIR)/sharpen.o
 TEST_GAMMA_TARGET = $(BUILD_DIR)/test_gamma
@@ -57,9 +60,10 @@ TEST_AHD_TARGET = $(BUILD_DIR)/test_ahd
 TEST_AMAZE_TARGET = $(BUILD_DIR)/test_amaze
 TEST_AMAZEVNG_TARGET = $(BUILD_DIR)/test_amazevng
 TEST_AMAZEFROMGITHUB_TARGET = $(BUILD_DIR)/test_amazefromgithub
+TEST_RCD_TARGET = $(BUILD_DIR)/test_rcd
 
 # 默认目标
-all: $(TEST_GAMMA_TARGET) $(TEST_VNG_TARGET) $(TEST_VNG_OPENCV_TARGET) $(TEST_AHD_TARGET) $(TEST_AMAZE_TARGET) $(TEST_AMAZEVNG_TARGET) $(TEST_AMAZEFROMGITHUB_TARGET)
+all: $(TEST_GAMMA_TARGET) $(TEST_VNG_TARGET) $(TEST_VNG_OPENCV_TARGET) $(TEST_AHD_TARGET) $(TEST_AMAZE_TARGET) $(TEST_AMAZEVNG_TARGET) $(TEST_AMAZEFROMGITHUB_TARGET) $(TEST_RCD_TARGET)
 
 # 创建构建目录
 $(BUILD_DIR):
@@ -99,6 +103,9 @@ $(BUILD_DIR)/amazevng.o: $(CORE_DIR)/amazevng.cpp $(CORE_DIR)/amazevng.h $(CORE_
 $(BUILD_DIR)/amazefromgithub.o: $(CORE_DIR)/amazefromgithub.cpp $(CORE_DIR)/amazefromgithub.h $(CORE_DIR)/demosiac.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/rcd.o: $(CORE_DIR)/rcd.cpp $(CORE_DIR)/rcd.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/ccm.o: $(CORE_DIR)/ccm.cpp $(CORE_DIR)/ccm.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
@@ -127,6 +134,9 @@ $(TEST_AMAZEVNG_TARGET): $(TESTS_DIR)/test_amazevng.cpp $(CORE_OBJECTS) | $(BUIL
 $(TEST_AMAZEFROMGITHUB_TARGET): $(TESTS_DIR)/test_amazefromgithub.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
 
+$(TEST_RCD_TARGET): $(TESTS_DIR)/test_rcd.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
+
 # 运行测试
 run-gamma: $(TEST_GAMMA_TARGET)
 	./$(TEST_GAMMA_TARGET)
@@ -149,6 +159,9 @@ run-amazevng: $(TEST_AMAZEVNG_TARGET)
 run-amazefromgithub: $(TEST_AMAZEFROMGITHUB_TARGET)
 	./$(TEST_AMAZEFROMGITHUB_TARGET)
 
+run-rcd: $(TEST_RCD_TARGET)
+	./$(TEST_RCD_TARGET)
+
 # 清理
 clean:
 	rm -rf $(BUILD_DIR)
@@ -164,8 +177,9 @@ help:
 	@echo "  make run-amaze       - Build and run test_amaze"
 	@echo "  make run-amazevng    - Build and run test_amazevng (AMaZE-VNG Hybrid)"
 	@echo "  make run-amazefromgithub - Build and run test_amazefromgithub (AMaZE From GitHub)"
+	@echo "  make run-rcd         - Build and run test_rcd (RCD Demosaic)"
 	@echo "  make clean           - Remove build files"
 	@echo "  make help            - Show this help message"
 
-.PHONY: all run-gamma run-vng run-vng-opencv run-ahd run-amaze run-amazevng run-amazefromgithub clean help
+.PHONY: all run-gamma run-vng run-vng-opencv run-ahd run-amaze run-amazevng run-amazefromgithub run-rcd clean help
 

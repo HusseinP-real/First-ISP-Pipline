@@ -170,8 +170,8 @@ void demosiacAMaZEFromGitHub(const cv::Mat& raw, cv::Mat& dst, bayerPattern patt
             float* Dgrbpsq1 = reinterpret_cast<float*>(buffer + 28 * sizeof(float) * TS * TS);
             float* Dgrbmsq1 = reinterpret_cast<float*>(buffer + 29 * sizeof(float) * TS * TS);
             float* cfa = reinterpret_cast<float*>(buffer + 30 * sizeof(float) * TS * TS);
-            float* pmwt = reinterpret_cast<float*>(buffer + 31 * sizeof(float) * TS * TS);
-            // rbp 和 rbm 在完整版本中用于对角插值，当前版本已简化
+            // pmwt, rbp 和 rbm 在完整版本中用于对角插值，当前版本已简化
+            // float* pmwt = reinterpret_cast<float*>(buffer + 31 * sizeof(float) * TS * TS);
             // float* rbp = reinterpret_cast<float*>(buffer + 32 * sizeof(float) * TS * TS);
             // float* rbm = reinterpret_cast<float*>(buffer + 33 * sizeof(float) * TS * TS);
             int* nyquist = reinterpret_cast<int*>(buffer + 34 * sizeof(float) * TS * TS);
@@ -521,77 +521,84 @@ void demosiacAMaZEFromGitHub(const cv::Mat& raw, cv::Mat& dst, bayerPattern patt
             }
 
             // =====================================================
-            // Diagonal interpolation for R/B at G sites
-            // 这是修复青色伪色的关键部分！
+            // 完整的色差插值 (Color Difference Interpolation)
             // =====================================================
             
-            // 首先在 R/B 位置计算 Dgrb[indx][0] (已经在上面完成了 G 插值)
-            // 现在需要在 G 位置插值 R-G 和 B-G
+            // 步骤1: 在 R/B 位置，Dgrb[indx][0] 已经包含了 G-R 或 G-B
+            // 现在需要正确分配到 Dgrb[0]=G-R, Dgrb[1]=G-B
             
-            // Interpolate Dgrb at G sites using diagonal directions
+            // 首先，将 R 位置和 B 位置的色差分别存储
+            // R 位置: Dgrb[0] 当前是 G-R，需要计算 G-B
+            // B 位置: Dgrb[0] 当前是 G-B，需要计算 G-R，并交换位置
+            
+            // 步骤1: 先处理 R/B 位置，正确分配 Dgrb[0] 和 Dgrb[1]
             for (int rr = 10; rr < rr1 - 10; rr++) {
                 for (int cc = 10 + (FC(rr, 2, start_x, start_y) & 1), indx = rr * TS + cc; 
                      cc < cc1 - 10; cc += 2, indx += 2) {
-                    // 计算对角方向的色差变化量
-                    float rbvarp = epssq + (delp[indx] + delp[indx - 1] + delp[indx + 1] + 
-                                            delp[indx - v1] + delp[indx + v1]);
-                    float rbvarm = epssq + (delm[indx] + delm[indx - 1] + delm[indx + 1] + 
-                                            delm[indx - v1] + delm[indx + v1]);
                     
-                    // 根据对角方向的变化量计算权重
-                    float pmwtalt = rbvarm / (rbvarp + rbvarm);
-                    pmwt[indx] = pmwtalt;
-                }
-            }
-            
-            // Interpolate R-G and B-G at green sites
-            for (int rr = 12; rr < rr1 - 12; rr++) {
-                int c = FC(rr, 12, start_x, start_y);
-                int h = c & 1;  // h=1 for G row
-                
-                for (int cc = 12 + h, indx = rr * TS + cc; cc < cc1 - 12; cc += 2, indx += 2) {
-                    // G position - need to interpolate R-G and B-G from neighbors
+                    int c = FC(rr, cc, start_x, start_y);  // 0=R, 2=B
                     
-                    // Determine if this G is on R row or B row
-                    bool on_red_row = (FC(rr, cc - 1, start_x, start_y) == 0) || 
-                                      (FC(rr, cc + 1, start_x, start_y) == 0);
-                    
-                    // Horizontal interpolation of color difference
-                    float Dgrb_h0, Dgrb_h1;
-                    if (on_red_row) {
-                        // R is horizontal neighbor, B is vertical neighbor
-                        Dgrb_h0 = 0.5f * (Dgrb[indx - 1][0] + Dgrb[indx + 1][0]);  // R-G
-                        Dgrb_h1 = 0.5f * (Dgrb[indx - v1][0] + Dgrb[indx + v1][0]); // B-G (from vertical)
-                    } else {
-                        // B is horizontal neighbor, R is vertical neighbor
-                        Dgrb_h1 = 0.5f * (Dgrb[indx - 1][0] + Dgrb[indx + 1][0]);  // B-G
-                        Dgrb_h0 = 0.5f * (Dgrb[indx - v1][0] + Dgrb[indx + v1][0]); // R-G (from vertical)
+                    if (c == 0) {
+                        // R site: Dgrb[0] = G-R (正确), 需要初始化 Dgrb[1] 为 0
+                        // G-R 已经正确存储
+                        Dgrb[indx][1] = 0.0f;  // 稍后插值
+                    } else if (c == 2) {
+                        // B site: Dgrb[0] = G-B, 需要移动到 Dgrb[1]
+                        Dgrb[indx][1] = Dgrb[indx][0];  // G-B
+                        Dgrb[indx][0] = 0.0f;  // 稍后插值 G-R
                     }
-                    
-                    Dgrb[indx][0] = Dgrb_h0;  // R-G at this G site
-                    Dgrb[indx][1] = Dgrb_h1;  // B-G at this G site
                 }
             }
             
-            // At R sites: need to compute B-G, at B sites: need to compute R-G
+            // 步骤2: 在 G 位置插值 G-R 和 G-B
+            for (int rr = 11; rr < rr1 - 11; rr++) {
+                for (int cc = 11, indx = rr * TS + cc; cc < cc1 - 11; cc++, indx++) {
+                    int c = FC(rr, cc, start_x, start_y);
+                    
+                    if (c == 1) {  // G site
+                        // 检查水平邻居是 R 还是 B
+                        int c_left = FC(rr, cc - 1, start_x, start_y);
+                        
+                        if (c_left == 0) {
+                            // 水平邻居是 R，垂直邻居是 B
+                            // G-R 从水平插值
+                            Dgrb[indx][0] = 0.5f * (Dgrb[indx - 1][0] + Dgrb[indx + 1][0]);
+                            // G-B 从垂直插值
+                            Dgrb[indx][1] = 0.5f * (Dgrb[indx - v1][1] + Dgrb[indx + v1][1]);
+                        } else {
+                            // 水平邻居是 B，垂直邻居是 R
+                            // G-B 从水平插值
+                            Dgrb[indx][1] = 0.5f * (Dgrb[indx - 1][1] + Dgrb[indx + 1][1]);
+                            // G-R 从垂直插值
+                            Dgrb[indx][0] = 0.5f * (Dgrb[indx - v1][0] + Dgrb[indx + v1][0]);
+                        }
+                    }
+                }
+            }
+            
+            // 步骤3: 在 R 位置插值 G-B，在 B 位置插值 G-R (使用对角插值)
             for (int rr = 12; rr < rr1 - 12; rr++) {
                 for (int cc = 12 + (FC(rr, 2, start_x, start_y) & 1), indx = rr * TS + cc; 
                      cc < cc1 - 12; cc += 2, indx += 2) {
                     
                     int c = FC(rr, cc, start_x, start_y);  // 0=R, 2=B
                     
+                    // 计算对角方向的权重
+                    float rbvarp = epssq + (delp[indx] + delp[indx - 1] + delp[indx + 1] + 
+                                            delp[indx - v1] + delp[indx + v1]);
+                    float rbvarm = epssq + (delm[indx] + delm[indx - 1] + delm[indx + 1] + 
+                                            delm[indx - v1] + delm[indx + v1]);
+                    float wt = rbvarm / (rbvarp + rbvarm);
+                    
                     if (c == 0) {
-                        // R site - Dgrb[indx][0] already has R-G, need B-G
-                        // Use diagonal interpolation with weighting
-                        float wt = pmwt[indx];
+                        // R site: 需要插值 G-B (Dgrb[1])
+                        // 从对角方向的 G 邻居获取 G-B
                         float Dgrb_diag_p = 0.5f * (Dgrb[indx - p1][1] + Dgrb[indx + p1][1]);
                         float Dgrb_diag_m = 0.5f * (Dgrb[indx - m1][1] + Dgrb[indx + m1][1]);
                         Dgrb[indx][1] = wt * Dgrb_diag_p + (1.0f - wt) * Dgrb_diag_m;
                     } else {
-                        // B site - Dgrb[indx][0] has B-G, need R-G
-                        // Swap: move current value to [1], compute [0]
-                        Dgrb[indx][1] = Dgrb[indx][0];
-                        float wt = pmwt[indx];
+                        // B site: 需要插值 G-R (Dgrb[0])
+                        // 从对角方向的 G 邻居获取 G-R
                         float Dgrb_diag_p = 0.5f * (Dgrb[indx - p1][0] + Dgrb[indx + p1][0]);
                         float Dgrb_diag_m = 0.5f * (Dgrb[indx - m1][0] + Dgrb[indx + m1][0]);
                         Dgrb[indx][0] = wt * Dgrb_diag_p + (1.0f - wt) * Dgrb_diag_m;
@@ -601,7 +608,7 @@ void demosiacAMaZEFromGitHub(const cv::Mat& raw, cv::Mat& dst, bayerPattern patt
 
             // =====================================================
             // 色差域平滑 (Color Difference Domain Smoothing)
-            // 使用 3x3 中值滤波抑制孤立伪色点
+            // 使用 3x3 中值滤波抑制孤立伪色点 - 可选，减轻强度
             // =====================================================
             
             // 创建临时缓冲区存储平滑后的色差
@@ -629,29 +636,32 @@ void demosiacAMaZEFromGitHub(const cv::Mat& raw, cv::Mat& dst, bayerPattern patt
                 }
             }
             
-            // 应用平滑后的色差（带权重混合，保留边缘）
+            // 轻度平滑 - 只修正明显的异常值
             for (int rr = 13; rr < rr1 - 13; rr++) {
                 for (int cc = 13, indx = rr * TS + cc; cc < cc1 - 13; cc++, indx++) {
-                    // 计算局部梯度来决定平滑强度
+                    // 只对偏差很大的点进行平滑
                     float grad0 = std::abs(Dgrb[indx][0] - Dgrb0_smooth[indx]);
                     float grad1 = std::abs(Dgrb[indx][1] - Dgrb1_smooth[indx]);
                     
-                    // 较大的偏差意味着可能是伪色，需要更强的平滑
-                    float smooth_wt0 = std::min(1.0f, grad0 * 10.0f);
-                    float smooth_wt1 = std::min(1.0f, grad1 * 10.0f);
-                    
-                    Dgrb[indx][0] = (1.0f - smooth_wt0) * Dgrb[indx][0] + smooth_wt0 * Dgrb0_smooth[indx];
-                    Dgrb[indx][1] = (1.0f - smooth_wt1) * Dgrb[indx][1] + smooth_wt1 * Dgrb1_smooth[indx];
+                    // 提高阈值，只修正真正的异常点
+                    const float threshold = 0.1f;  // 10% 的偏差才平滑
+                    if (grad0 > threshold) {
+                        Dgrb[indx][0] = Dgrb0_smooth[indx];
+                    }
+                    if (grad1 > threshold) {
+                        Dgrb[indx][1] = Dgrb1_smooth[indx];
+                    }
                 }
             }
 
             // Final RGB computation
-            // 注意: Dgrb 存储的是 G-R 和 G-B (即 -(R-G) 和 -(B-G))
-            // 所以 R = G - Dgrb[0], B = G - Dgrb[1]
+            // Dgrb[0] = G-R, Dgrb[1] = G-B
+            // R = G - (G-R) = G - Dgrb[0]
+            // B = G - (G-B) = G - Dgrb[1]
             for (int rr = 14; rr < rr1 - 14; rr++) {
                 for (int cc = 14, indx = rr * TS + cc; cc < cc1 - 14; cc++, indx++) {
-                    rgb[indx][0] = rgb[indx][1] - Dgrb[indx][0];  // R = G - (G-R) = G - Dgrb[0]
-                    rgb[indx][2] = rgb[indx][1] - Dgrb[indx][1];  // B = G - (G-B) = G - Dgrb[1]
+                    rgb[indx][0] = rgb[indx][1] - Dgrb[indx][0];  // R
+                    rgb[indx][2] = rgb[indx][1] - Dgrb[indx][1];  // B
                 }
             }
 
