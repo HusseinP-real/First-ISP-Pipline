@@ -8,6 +8,10 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 OPENCV_CFLAGS = $(shell pkg-config --cflags opencv4 2>/dev/null || pkg-config --cflags opencv)
 OPENCV_LIBS = $(shell pkg-config --libs opencv4 2>/dev/null || pkg-config --libs opencv)
 
+# OpenMP 配置
+OPENMP_CFLAGS = -fopenmp
+OPENMP_LIBS = -fopenmp
+
 # 目录设置
 SRC_DIR = src
 CORE_DIR = $(SRC_DIR)/core
@@ -27,6 +31,7 @@ CORE_SOURCES = $(CORE_DIR)/raw_reader.cpp \
                $(CORE_DIR)/amazevng.cpp \
                $(CORE_DIR)/amazefromgithub.cpp \
                $(CORE_DIR)/rcd.cpp \
+               $(CORE_DIR)/lmmse.cpp \
                $(CORE_DIR)/ccm.cpp \
                $(CORE_DIR)/sharpen.cpp
 TEST_SOURCES = $(TESTS_DIR)/test_gamma.cpp \
@@ -36,7 +41,8 @@ TEST_SOURCES = $(TESTS_DIR)/test_gamma.cpp \
                $(TESTS_DIR)/test_amaze.cpp \
                $(TESTS_DIR)/test_amazevng.cpp \
                $(TESTS_DIR)/test_amazefromgithub.cpp \
-               $(TESTS_DIR)/test_rcd.cpp
+               $(TESTS_DIR)/test_rcd.cpp \
+               $(TESTS_DIR)/test_lmmse.cpp
 
 # 目标文件
 CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
@@ -51,6 +57,7 @@ CORE_OBJECTS = $(BUILD_DIR)/raw_reader.o \
                $(BUILD_DIR)/amazevng.o \
                $(BUILD_DIR)/amazefromgithub.o \
                $(BUILD_DIR)/rcd.o \
+               $(BUILD_DIR)/lmmse.o \
                $(BUILD_DIR)/ccm.o \
                $(BUILD_DIR)/sharpen.o
 TEST_GAMMA_TARGET = $(BUILD_DIR)/test_gamma
@@ -61,9 +68,10 @@ TEST_AMAZE_TARGET = $(BUILD_DIR)/test_amaze
 TEST_AMAZEVNG_TARGET = $(BUILD_DIR)/test_amazevng
 TEST_AMAZEFROMGITHUB_TARGET = $(BUILD_DIR)/test_amazefromgithub
 TEST_RCD_TARGET = $(BUILD_DIR)/test_rcd
+TEST_LMMSE_TARGET = $(BUILD_DIR)/test_lmmse
 
 # 默认目标
-all: $(TEST_GAMMA_TARGET) $(TEST_VNG_TARGET) $(TEST_VNG_OPENCV_TARGET) $(TEST_AHD_TARGET) $(TEST_AMAZE_TARGET) $(TEST_AMAZEVNG_TARGET) $(TEST_AMAZEFROMGITHUB_TARGET) $(TEST_RCD_TARGET)
+all: $(TEST_GAMMA_TARGET) $(TEST_VNG_TARGET) $(TEST_VNG_OPENCV_TARGET) $(TEST_AHD_TARGET) $(TEST_AMAZE_TARGET) $(TEST_AMAZEVNG_TARGET) $(TEST_AMAZEFROMGITHUB_TARGET) $(TEST_RCD_TARGET) $(TEST_LMMSE_TARGET)
 
 # 创建构建目录
 $(BUILD_DIR):
@@ -106,6 +114,9 @@ $(BUILD_DIR)/amazefromgithub.o: $(CORE_DIR)/amazefromgithub.cpp $(CORE_DIR)/amaz
 $(BUILD_DIR)/rcd.o: $(CORE_DIR)/rcd.cpp $(CORE_DIR)/rcd.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/lmmse.o: $(CORE_DIR)/lmmse.cpp $(CORE_DIR)/lmmse.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) $(OPENMP_CFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/ccm.o: $(CORE_DIR)/ccm.cpp $(CORE_DIR)/ccm.h | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
@@ -137,6 +148,9 @@ $(TEST_AMAZEFROMGITHUB_TARGET): $(TESTS_DIR)/test_amazefromgithub.cpp $(CORE_OBJ
 $(TEST_RCD_TARGET): $(TESTS_DIR)/test_rcd.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS)
 
+$(TEST_LMMSE_TARGET): $(TESTS_DIR)/test_lmmse.cpp $(CORE_OBJECTS) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(OPENCV_CFLAGS) $(OPENMP_CFLAGS) -o $@ $< $(CORE_OBJECTS) $(OPENCV_LIBS) $(OPENMP_LIBS)
+
 # 运行测试
 run-gamma: $(TEST_GAMMA_TARGET)
 	./$(TEST_GAMMA_TARGET)
@@ -162,6 +176,9 @@ run-amazefromgithub: $(TEST_AMAZEFROMGITHUB_TARGET)
 run-rcd: $(TEST_RCD_TARGET)
 	./$(TEST_RCD_TARGET)
 
+run-lmmse: $(TEST_LMMSE_TARGET)
+	./$(TEST_LMMSE_TARGET)
+
 # 清理
 clean:
 	rm -rf $(BUILD_DIR)
@@ -178,8 +195,9 @@ help:
 	@echo "  make run-amazevng    - Build and run test_amazevng (AMaZE-VNG Hybrid)"
 	@echo "  make run-amazefromgithub - Build and run test_amazefromgithub (AMaZE From GitHub)"
 	@echo "  make run-rcd         - Build and run test_rcd (RCD Demosaic)"
+	@echo "  make run-lmmse       - Build and run test_lmmse (LMMSE Demosaic)"
 	@echo "  make clean           - Remove build files"
 	@echo "  make help            - Show this help message"
 
-.PHONY: all run-gamma run-vng run-vng-opencv run-ahd run-amaze run-amazevng run-amazefromgithub run-rcd clean help
+.PHONY: all run-gamma run-vng run-vng-opencv run-ahd run-amaze run-amazevng run-amazefromgithub run-rcd run-lmmse clean help
 
