@@ -9,7 +9,7 @@
 ## 项目结构概览
 
 ```
-pusenProject1/
+First-ISP-Pipline/
 ├── src/              # 源代码
 │   ├── core/         # 核心pipeline和I/O
 │   ├── modules/      # ISP处理模块
