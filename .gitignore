@@ -30,12 +30,13 @@ obj/
 # Data files
 data/output/*
 !data/output/.gitkeep
+!data/output/*.png
 data/reference/*
 !data/reference/.gitkeep
 *.raw
 *.dng
 *.jpg
-*.png
+# *.png  # Commented out to show PNG files in output directory
 *.tiff
 *.tif
 
