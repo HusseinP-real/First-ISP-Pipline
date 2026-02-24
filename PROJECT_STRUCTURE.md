@@ -4,6 +4,7 @@
 
 ```
 First-ISP-Pipline/
+├── bm3d/                         # BM3D 降噪算法独立实现
 ├── src/                          # 源代码目录
 │   ├── core/                     # 核心ISP处理实现
 │   │   ├── bmp/                  # BMP处理与高级降噪 (NLM, BM3D, DCT, DWT)
@@ -44,6 +45,12 @@ First-ISP-Pipline/
 - **modules/**: ISP各个处理模块（黑电平、去马赛克、白平衡等）
 - **utils/**: 工具函数（图像处理、数学运算、配置加载等）
 - **tests/**: 包含针对不同算法的独立测试程序，可生成对比图像。
+
+### bm3d/
+- 包含 BM3D (Block-matching and 3D filtering) 算法的独立 C++ 实现。
+- **include/**: BM3D 算法头文件。
+- **src/**: 核心算法实现逻辑（块匹配、硬阈值滤波等）。
+- **main.cpp**: 用于演示和测试 BM3D 效果的入口程序。
 
 ### include/ (可选)
 - 如果使用头文件和源文件分离的结构，可以将头文件放在这里
